@@ -6,7 +6,9 @@
 #include <iostream>
 #include <unistd.h>
 
-size_t fdcopy(int readfd, int writefd, size_t chunk_size)
+bool verbose = true;
+
+size_t copyfd(int readfd, int writefd, size_t chunk_size)
 {
     fd_set read_set;
     fd_set write_set;
@@ -26,7 +28,7 @@ size_t fdcopy(int readfd, int writefd, size_t chunk_size)
 	bufr.pushInquire(read_available, read_start);
 	if (read_available)
 	{
-	    read_available = std::max(read_available, chunk_size);
+	    read_available = std::min(read_available, chunk_size);
 	    FD_SET(readfd, &read_set);
 	    p_read_set = &read_set;
 	}
@@ -49,7 +51,7 @@ size_t fdcopy(int readfd, int writefd, size_t chunk_size)
 	}
 
 	bytes_read = 0;
-	if (FD_ISSET(readfd, p_read_set))
+	if (p_read_set && FD_ISSET(readfd, p_read_set))
 	{
 	    bytes_read = read(readfd, read_start, read_available);
 	    if (bytes_read < 0)
@@ -64,7 +66,7 @@ size_t fdcopy(int readfd, int writefd, size_t chunk_size)
 	}
 
 	bytes_write = 0;
-	if (FD_ISSET(writefd, p_write_set))
+	if (p_write_set && FD_ISSET(writefd, p_write_set))
 	{
 	    bytes_write = write(writefd, write_start, write_available);
 	    if (bytes_write < 0)
@@ -78,6 +80,14 @@ size_t fdcopy(int readfd, int writefd, size_t chunk_size)
 		bytes_processed += bytes_write;
 	    }
 	}
+
+	if (verbose)
+	{
+	    std::cerr << "read " << bytes_read <<
+	        " write " << bytes_write <<
+	    std::endl;
+	}
+
     } while (bytes_read || bytes_write);
 
     return bytes_processed;
