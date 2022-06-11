@@ -139,7 +139,8 @@ static void* Reader (void* arg)
 	    if (verbose >= 1)
 	    {
 		std::cout << "*** ERROR *** ";
-		std::cout << "Pop " << serial << std::endl;
+		std::cout << "Pop: expected " << serial << " got " <<
+		    start->serialNumber << std::endl;
 	    }
 	}
 	else
