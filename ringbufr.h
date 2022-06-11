@@ -26,6 +26,9 @@ public:
 
     RingbufR (size_t capacity);
     virtual ~RingbufR ();
+    RingbufR() = delete; // No default constructor
+    RingbufR(const RingbufR<_T>&) = delete; // No copy constructor
+
     void pushInquire(size_t& available, _T*& start) const;
     void push(size_t newContent);
     void popInquire(size_t& available, _T*& start) const;
@@ -35,11 +38,6 @@ protected:
 
     virtual void updateStart(size_t increment);
     virtual void updateEnd(size_t increment);
-
-private:
-
-    RingbufR() = delete; // No default constructor
-    RingbufR(const RingbufR<_T>&) = delete; // No copy constructor
 
     const size_t _capacity;
     _T* const _ring_start;

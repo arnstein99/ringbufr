@@ -1,5 +1,7 @@
 // Implementation of RingbufR
 
+#include <cassert>
+
 template<typename _T>
 RingbufR<_T>::RingbufR (size_t capacity)
     : _capacity(capacity),
@@ -27,7 +29,7 @@ void RingbufR<_T>::pushInquire(size_t& available, _T*& start) const
     }
     else
     {
-	if (_push_next < _pop_next)
+	if (_push_next <= _pop_next)
 	{
 	    // Deal with wrap-around
 	    available = _pop_next - _push_next;
@@ -36,8 +38,8 @@ void RingbufR<_T>::pushInquire(size_t& available, _T*& start) const
 	{
 	    available = _ring_end - _push_next;
 	}
-	start = _push_next;
     }
+    start = _push_next;
 }
 
 template<typename _T>
@@ -51,10 +53,11 @@ void RingbufR<_T>::updateEnd(size_t increment)
     {
         assert(_push_next == _pop_next);
 	limit = _ring_end;
+	_empty = false;
     }
     else
     {
-	if (_push_next < _pop_next)
+	if (_push_next <= _pop_next)
 	{
 	    // Deal with wrap-around
 	    limit = _pop_next;
@@ -63,7 +66,6 @@ void RingbufR<_T>::updateEnd(size_t increment)
 	{
 	    limit = _ring_end;
 	}
-	_empty = false;
     }
 
     if (new_next > limit)
@@ -87,11 +89,11 @@ void RingbufR<_T>::popInquire(size_t& available, _T*& start) const
     if (_empty)
     {
         assert(_push_next == _pop_next);
-        available = _ring_end - _pop_next;
+        available = 0;
     }
     else
     {
-	if (_push_next < _pop_next)
+	if (_push_next <= _pop_next)
 	{
 	    // Deal with wrap-around
 	    available = _ring_end - _pop_next;
@@ -118,7 +120,7 @@ void RingbufR<_T>::updateStart(size_t increment)
     }
     else
     {
-	if (_push_next < _pop_next)
+	if (_push_next <= _pop_next)
 	{
 	    // Deal with wrap-around
 	    limit = _ring_end;

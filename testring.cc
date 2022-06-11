@@ -9,9 +9,9 @@
 #include "posix_ringbufr.h"
 
 // Tuning
-static const int read_usleep_range = 4;
-static const int write_usleep_range = 4;
-static const int verbose = 3;
+static const int read_usleep_range = 100000;
+static const int write_usleep_range = 100000;
+static const int verbose = 1;
 #define USE_POSIX
 #define DEFAULT_RUN_SECONDS 30
 
@@ -24,7 +24,7 @@ public:
 };
 
 #ifdef USE_POSIX
-static Posix_RingbufR<Dummy> rbuf (11);
+static Posix_RingbufR<Dummy> rbuf (11, (verbose >= 1 ? true : false));
 #else
 static RingbufR<Dummy> rbuf (11);
 #endif
@@ -106,9 +106,9 @@ static void* Writer (void* arg)
 	if (available)
 	{
 	    start->serialNumber = ++serial;
-	    if (verbose >= 3)
+	    if (verbose >= 1)
 	    {
-		std::cout << "(pushed " << serial << ")" << std::endl;
+		std::cout << "(will push " << serial << ")" << std::endl;
 	    }
 	    try
 	    {
@@ -116,15 +116,13 @@ static void* Writer (void* arg)
 	    }
 	    catch (RingbufRFullException)
 	    {
-		if (verbose >= 1)
-		    std::cout << "Write failure " << serial << std::endl;
-		--serial;
+		std::cout << "Write failure " << serial << std::endl;
 		exit(1);
 	    }
 	}
 	else
 	{
-	    if (verbose >= 3)
+	    if (verbose >= 1)
 	        std::cout << "(missed opportunity push)" << std::endl;
 	}
     }
@@ -148,19 +146,13 @@ static void* Reader (void* arg)
 	{
 	    ++serial;
 	    auto observed = start->serialNumber;
+	    if (verbose >= 1)
+		std::cout << "(will pop " << observed << ")" << std::endl;
 	    if (observed != serial)
 	    {
-		if (verbose >= 2)
-		{
-		    std::cout << "*** ERROR *** ";
-		    std::cout << "Pop: expected " << serial << " got " <<
-			observed << std::endl;
-		}
-	    }
-	    else
-	    {
-		if (verbose >= 3)
-		    std::cout << "(popped " << observed << ")" << std::endl;
+		std::cout << "*** ERROR *** ";
+		std::cout << "Pop: expected " << serial << " got " <<
+		    observed << std::endl;
 	    }
 	    try
 	    {
@@ -168,15 +160,13 @@ static void* Reader (void* arg)
 	    }
 	    catch (RingbufREmptyException)
 	    {
-		if (verbose >= 1)
-		    std::cout << "Read failure " << serial << std::endl;
-		--serial;
+		std::cout << "Read failure " << serial << std::endl;
 		exit(1);
 	    }
 	}
 	else
 	{
-	    if (verbose >= 3)
+	    if (verbose >= 1)
 	        std::cout << "(missed opportunity pop)" << std::endl;
 	}
     }
