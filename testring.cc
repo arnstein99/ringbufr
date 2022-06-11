@@ -9,9 +9,9 @@
 #include "posix_ringbufr.h"
 
 // Tuning
-static const int read_usleep = 1;
-static const int write_usleep = 1;
-static const int verbose = 1;
+static const int read_usleep_range = 4;
+static const int write_usleep_range = 4;
+static const int verbose = 3;
 #define USE_POSIX
 #define DEFAULT_RUN_SECONDS 30
 
@@ -89,7 +89,6 @@ int main (int argc, char* argv[])
 	exit (1);
     }
 
-    std::cout << "No compare errors found" << std::endl;
     exit (0);
 }
 
@@ -99,24 +98,35 @@ static void* Writer (void* arg)
 
     while (true)
     {
+	int write_usleep = (rand() % write_usleep_range) + 1;
 	usleep (write_usleep);
 	size_t available;
 	Dummy* start;
 	rbuf.pushInquire(available, start);
-	start->serialNumber = ++serial;
-        try
-        {
-	    rbuf.push(1);
-        }
-        catch (RingbufRFullException)
-        {
-	    if (verbose >= 2)
-		std::cout << "Write failure " << serial << std::endl;
-            --serial;
-            continue;
-        }
-	if (verbose >= 3)
-	    std::cout << "Put " << serial << std::endl;
+	if (available)
+	{
+	    start->serialNumber = ++serial;
+	    if (verbose >= 3)
+	    {
+		std::cout << "(pushed " << serial << ")" << std::endl;
+	    }
+	    try
+	    {
+		rbuf.push(1);
+	    }
+	    catch (RingbufRFullException)
+	    {
+		if (verbose >= 1)
+		    std::cout << "Write failure " << serial << std::endl;
+		--serial;
+		exit(1);
+	    }
+	}
+	else
+	{
+	    if (verbose >= 3)
+	        std::cout << "(missed opportunity push)" << std::endl;
+	}
     }
     
     return NULL;
@@ -129,36 +139,46 @@ static void* Reader (void* arg)
 
     while (true)
     {
+	int read_usleep = (rand() % read_usleep_range) + 1;
         usleep (read_usleep);
-	++serial;
 	size_t available;
 	Dummy* start;
 	rbuf.popInquire(available, start);
-	if (start->serialNumber != serial)
+	if (available)
 	{
-	    if (verbose >= 1)
+	    ++serial;
+	    auto observed = start->serialNumber;
+	    if (observed != serial)
 	    {
-		std::cout << "*** ERROR *** ";
-		std::cout << "Pop: expected " << serial << " got " <<
-		    start->serialNumber << std::endl;
+		if (verbose >= 2)
+		{
+		    std::cout << "*** ERROR *** ";
+		    std::cout << "Pop: expected " << serial << " got " <<
+			observed << std::endl;
+		}
+	    }
+	    else
+	    {
+		if (verbose >= 3)
+		    std::cout << "(popped " << observed << ")" << std::endl;
+	    }
+	    try
+	    {
+		rbuf.pop(1);
+	    }
+	    catch (RingbufREmptyException)
+	    {
+		if (verbose >= 1)
+		    std::cout << "Read failure " << serial << std::endl;
+		--serial;
+		exit(1);
 	    }
 	}
 	else
 	{
 	    if (verbose >= 3)
-		std::cout << "Pop " << serial << std::endl;
+	        std::cout << "(missed opportunity pop)" << std::endl;
 	}
-        try
-        {
-	    rbuf.pop(1);
-        }
-        catch (RingbufREmptyException)
-        {
-	    if (verbose >= 2)
-		std::cout << "Read failure " << serial << std::endl;
-            --serial;
-            continue;
-        }
     }
 
     return NULL;

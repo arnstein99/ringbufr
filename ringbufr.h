@@ -33,22 +33,20 @@ public:
 
 protected:
 
-    virtual void updateStart(_T* newStart) {
-        _pop_next = newStart; }
-    virtual void updateEnd(_T* newEnd) {
-        _push_next = newEnd;
-    }
+    virtual void updateStart(size_t increment);
+    virtual void updateEnd(size_t increment);
 
 private:
 
     RingbufR() = delete; // No default constructor
     RingbufR(const RingbufR<_T>&) = delete; // No copy constructor
 
-    size_t _capacity;
+    const size_t _capacity;
+    _T* const _ring_start;
+    _T* const _ring_end;
+    bool _empty;
     _T* _push_next;
     _T* _pop_next;
-    _T* _ring_start;
-    _T* _ring_end;
 };
 
 // Implementation
