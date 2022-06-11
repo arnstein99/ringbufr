@@ -9,11 +9,11 @@
 #include "posix_ringbufr.h"
 
 // Tuning
-static const int read_usleep_range = 100000;
-static const int write_usleep_range = 100000;
-static const int verbose = 1;
+static const int read_usleep_range = 1000000;
+static const int write_usleep_range = 1000000;
+static const int verbose = 0;
 #define USE_POSIX
-#define DEFAULT_RUN_SECONDS 30
+#define DEFAULT_RUN_SECONDS 300
 
 class Dummy
 {

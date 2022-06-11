@@ -5,6 +5,8 @@
 #ifndef __RINGBUFR_H_
 #define __RINGBUFR_H_
 
+#include <cstddef>
+
 // Some exceptions for use with this class
 class RingbufRException
 {

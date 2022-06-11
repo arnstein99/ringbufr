@@ -7,6 +7,7 @@
 #include <mutex>
 #include <iostream>
 #include <pthread.h>
+#include <cstddef>
 #include "ringbufr.h"
 
 template<typename _T>
