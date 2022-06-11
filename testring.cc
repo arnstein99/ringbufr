@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <errno.h>
 #include <unistd.h>
@@ -99,12 +100,12 @@ static void* Writer (void* arg)
     while (true)
     {
 	usleep (write_usleep);
+	size_t available;
+	Dummy* start;
+	rbuf.pushInquire(available, start);
+	start->serialNumber = ++serial;
         try
         {
-	    size_t available;
-	    Dummy* start;
-	    rbuf.pushInquire(available, start);
-	    start->serialNumber = ++serial;
 	    rbuf.push(1);
         }
         catch (RingbufRFullException)
@@ -139,7 +140,6 @@ static void* Reader (void* arg)
 	    {
 		std::cout << "*** ERROR *** ";
 		std::cout << "Pop " << serial << std::endl;
-		exit (1);
 	    }
 	}
 	else
