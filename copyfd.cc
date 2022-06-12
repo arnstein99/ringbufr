@@ -10,6 +10,7 @@ bool verbose = true;
 
 size_t copyfd(int readfd, int writefd, size_t chunk_size)
 {
+    int maxfd = std::max(readfd, writefd) + 1;
     fd_set read_set;
     fd_set write_set;
 
@@ -43,7 +44,7 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	}
 
         int select_return = 
-	    select(2, p_read_set, p_write_set, nullptr, nullptr);
+	    select(maxfd, p_read_set, p_write_set, nullptr, nullptr);
 	if (select_return < 0)
 	{
 	    std::cerr << "select " << strerror(errno) << std::endl;
