@@ -1,5 +1,6 @@
-#include "ringbufr.h"
+#include "copyfd.h"
 
+#include "ringbufr.h"
 #include <sys/select.h>
 #include <algorithm>
 #include <cstring>
@@ -49,23 +50,25 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
             {
                 if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
                 {
+                    // This is when to select()
                     FD_ZERO(&read_set);
                     FD_SET(readfd, &read_set);
                     p_read_set = &read_set;
                 }
                 else
                 {
-		    std::cerr << "read: " << strerror(errno) << std::endl;
-                    break;
+                    // Some other error on input
+                    errorexit("read");
                 }
             }
             else if (bytes_read == 0)
             {
                 // End of input
-                break;
+                ;
             }
             else
             {
+                // Some data was input, no need to select.
                 bufr.push(bytes_read);
             }
 	}
@@ -83,6 +86,7 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 		if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
 		{
                     CHECKPOINT;
+                    // This is when to select().
 		    FD_ZERO(&write_set);
 		    FD_SET(writefd, &write_set);
 		    p_write_set = &write_set;
@@ -90,19 +94,21 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 		else
 		{
                     CHECKPOINT;
-		    std::cerr << "write: " << strerror(errno) << std::endl;
-		    break;
+                    // Some other error on write
+                    errorexit("write");
 		}
 	    }
             else if (bytes_write == 0)
             {
                 CHECKPOINT;
+                // Cannot accept EOF on write.
                 std::cerr << "copyfd: EOF on write descriptor" << std::endl;
-                break;
+                exit(1);
             }
             else
 	    {
                 CHECKPOINT;
+                // Some data was output, no need to select.
 	        bufr.pop(bytes_write);
 		bytes_processed += bytes_write;
 	    }
@@ -110,18 +116,18 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 
         if (p_read_set || p_write_set)
         {
-            int select_return = 
-                select(maxfd, p_read_set, p_write_set, nullptr, nullptr);
-            if (select_return < 0)
-            {
-                std::cerr << "select: " << strerror(errno) << std::endl;
-                continue;
-            }
+            int select_return;
+            NEGCHECK("select",
+                (select_return = select(
+                    maxfd, p_read_set, p_write_set, nullptr, nullptr)));
         }
 
 #ifdef VERBOSE
-	std::cerr << "read " << bytes_read << " write " << bytes_write <<
-	std::endl;
+    std::cerr << (p_read_set ? "<" : " ");
+	std::cerr << "read " << bytes_read << " ";
+    std::cerr << " ";
+    std::cerr << (p_write_set ? ">" : " ");
+    std::cerr << "write " << bytes_write << std::endl;
 #endif
 
     } while (bytes_read || bytes_write);
