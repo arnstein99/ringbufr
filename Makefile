@@ -1,6 +1,7 @@
-CPPFLAGS += -std=c++20 -g -Wall -pthread
-LDFLAGS += -lstdc++ -lpthread
-LINK.o = g++ $(LDFLAGS)
+CCFLAGS += -std=c++20 -g -Wall -pthread
+LDFLAGS += -lpthread
+LINK.o = c++ $(LDFLAGS)
+COMPILE.cc = c++ -c $(CCFLAGS)
 
 all: testring ringcat tcpget tcpput
 
