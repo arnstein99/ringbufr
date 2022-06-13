@@ -35,6 +35,7 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	    p_read_set = &read_set;
 	}
 
+	bytes_write = 0;
 	unsigned char* write_start;
 	size_t write_available;
 	bufr.popInquire(write_available, write_start);
