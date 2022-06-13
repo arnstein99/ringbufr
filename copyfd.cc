@@ -6,7 +6,7 @@
 #include <iostream>
 #include <unistd.h>
 
-bool verbose = true;
+// #define VERBOSE
 
 size_t copyfd(int readfd, int writefd, size_t chunk_size)
 {
@@ -86,12 +86,10 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	    }
 	}
 
-	if (verbose)
-	{
-	    std::cerr << "read " << bytes_read <<
-	        " write " << bytes_write <<
-	    std::endl;
-	}
+#ifdef VERBOSE
+	std::cerr << "read " << bytes_read << " write " << bytes_write <<
+	std::endl;
+#endif
 
     } while (bytes_read || bytes_write);
 
