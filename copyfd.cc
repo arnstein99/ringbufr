@@ -30,6 +30,7 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	if (read_available)
 	{
 	    read_available = std::min(read_available, chunk_size);
+	    FD_ZERO(&read_set);
 	    FD_SET(readfd, &read_set);
 	    p_read_set = &read_set;
 	}
@@ -44,6 +45,7 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	    {
 		if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
 		{
+		    FD_ZERO(&write_set);
 		    FD_SET(writefd, &write_set);
 		    p_write_set = &write_set;
 		}
