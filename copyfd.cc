@@ -39,7 +39,7 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	bufr.popInquire(write_available, write_start);
 	if (write_available)
 	{
-	    FD_SET(1, &write_set);
+	    FD_SET(writefd, &write_set);
 	    p_write_set = &write_set;
 	}
 

@@ -68,7 +68,7 @@ int main (int argc, char* argv[])
     set_flags(socketFD, O_WRONLY|O_NONBLOCK);
 
     // Prepare input file descriptor
-    set_flags(0, O_RDONLY|O_NONBLOCK);
+    set_flags(0, O_NONBLOCK);
 
     // Copy!
     auto bytes_processed = copyfd(0, socketFD, 64*1024);

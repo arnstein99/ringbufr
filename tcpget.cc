@@ -6,11 +6,11 @@
 #include <arpa/inet.h>
 #include "copyfd.h"
 
-void set_nonblock_flag(int fd)
+void set_flags(int fd, int flags)
 {
-    int flags = fcntl(fd, F_GETFL, 0);
-    flags |= O_NONBLOCK;
-    int retval = fcntl(fd, F_SETFL, flags);
+    int oldflags = fcntl(fd, F_GETFL, 0);
+    oldflags |= flags;
+    int retval = fcntl(fd, F_SETFL, oldflags);
     if (retval != 0)
     {
         std::cerr << "fcntl " << strerror(errno) << std::endl;
@@ -28,13 +28,13 @@ int main (int argc, char* argv[])
     int port_num = std::stoi(argv[1]);
 
     // Create listening socket
-    struct sockaddr_in sa;
     int socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socketFD == -1)
     {
 	std::cerr << "socket: " << strerror(errno) << std::endl;
 	exit (1);
     }
+    struct sockaddr_in sa;
     memset (&sa, 0, sizeof (sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons ((uint16_t)port_num);
@@ -68,10 +68,11 @@ int main (int argc, char* argv[])
 	std::cerr << "accept: " << strerror(errno) << std::endl;
 	exit (1);
     }
-    set_nonblock_flag(connectFD);
+    std::cerr << "connected" << std::endl;
+    set_flags(connectFD, O_NONBLOCK|O_RDONLY);
 
     // Prepare output file descriptor
-    set_nonblock_flag(1);
+    set_flags(1, O_NONBLOCK);
 
     // Copy!
     auto bytes_processed = copyfd(connectFD, 1, 64*1024);
