@@ -16,8 +16,8 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 
     RingbufR<unsigned char> bufr(3 * chunk_size);
 
-    ssize_t bytes_read;
-    ssize_t bytes_write;
+    ssize_t bytes_read = 0;
+    ssize_t bytes_write = 0;
     size_t bytes_processed = 0;
     do
     {
@@ -39,8 +39,25 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	bufr.popInquire(write_available, write_start);
 	if (write_available)
 	{
-	    FD_SET(writefd, &write_set);
-	    p_write_set = &write_set;
+	    bytes_write = write(writefd, write_start, write_available);
+	    if (bytes_write < 0)
+	    {
+		if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+		{
+		    FD_SET(writefd, &write_set);
+		    p_write_set = &write_set;
+		}
+		else
+		{
+		    std::cerr << "write " << strerror(errno) << std::endl;
+		    break;
+		}
+	    }
+	    else
+	    {
+	        bufr.pop(bytes_write);
+		bytes_processed += bytes_write;
+	    }
 	}
 
         int select_return = 
@@ -63,22 +80,6 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	    else
 	    {
 	        bufr.push(bytes_read);
-	    }
-	}
-
-	bytes_write = 0;
-	if (p_write_set && FD_ISSET(writefd, p_write_set))
-	{
-	    bytes_write = write(writefd, write_start, write_available);
-	    if (bytes_write < 0)
-	    {
-		std::cerr << "write " << strerror(errno) << std::endl;
-		break;
-	    }
-	    else
-	    {
-	        bufr.pop(bytes_write);
-		bytes_processed += bytes_write;
 	    }
 	}
 
