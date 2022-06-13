@@ -59,7 +59,7 @@ int main (int argc, char* argv[])
     }
     int optval = 1;
     if (setsockopt (
-	socketFD, SOL_SOCKET, SO_KEEPALIVE|O_WRONLY, &optval, sizeof(optval))
+	socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval))
 	< 0)
     {
 	std::cerr << "setsockopt: " << strerror(errno) << std::endl;
@@ -74,5 +74,6 @@ int main (int argc, char* argv[])
     auto bytes_processed = copyfd(0, socketFD, 64*1024);
     std::cerr << bytes_processed << " copied" << std::endl;
 
+    close(socketFD);
     return 0;
 }

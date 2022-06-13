@@ -78,5 +78,6 @@ int main (int argc, char* argv[])
     auto bytes_processed = copyfd(connectFD, 1, 64*1024);
     std::cerr << bytes_processed << " copied" << std::endl;
 
+    close(connectFD);
     return 0;
 }
