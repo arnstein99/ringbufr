@@ -12,6 +12,12 @@
         /* std::cerr << "checkpoint " << __LINE__ << std::endl; */ \
     } while (false)
 
+void errorexit(const char* message)
+{
+    std::cerr << message << ": " << strerror(errno) << std::endl;
+    exit(errno);
+}
+
 size_t copyfd(int readfd, int writefd, size_t chunk_size)
 {
     int maxfd = std::max(readfd, writefd) + 1;

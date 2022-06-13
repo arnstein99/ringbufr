@@ -7,16 +7,13 @@
 #include <arpa/inet.h>
 #include "copyfd.h"
 
+// #define VERBOSE
+
 void set_flags(int fd, int flags)
 {
     int oldflags = fcntl(fd, F_GETFL, 0);
     oldflags |= flags;
-    int retval = fcntl(fd, F_SETFL, oldflags);
-    if (retval != 0)
-    {
-        std::cerr << "fcntl " << strerror(errno) << std::endl;
-	exit(retval);
-    }
+    ZEROCHECK("fcntl", fcntl(fd, F_SETFL, oldflags));
 }
 
 int main (int argc, char* argv[])
@@ -30,19 +27,12 @@ int main (int argc, char* argv[])
     const int port_num = std::stoi(argv[2]);
 
     // Create socket
-    int socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (socketFD == -1)
-    {
-	std::cerr << "socket: " << strerror(errno) << std::endl;
-	exit (1);
-    }
+    int socketFD;
+    NEGCHECK("socket", (socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
 
     // Process host name
     struct hostent* server = gethostbyname(hostname);
-    if (server == NULL) {
-	std::cerr << "gethostbyname: " << strerror(errno) << std::endl;
-	exit (1);
-    }
+    if (server == NULL) errorexit("gethostbyname");
     struct sockaddr_in serveraddr;
     bzero((char *) &serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
@@ -51,28 +41,22 @@ int main (int argc, char* argv[])
     serveraddr.sin_port = htons(port_num);
 
     // Connect to server
-    if (connect(
-        socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)) < 0)
-    {
-	std::cerr << "connect: " << strerror(errno) << std::endl;
-	exit (1);
-    }
+    NEGCHECK ("connect", connect(
+        socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)));
     int optval = 1;
-    if (setsockopt (
-	socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval))
-	< 0)
-    {
-	std::cerr << "setsockopt: " << strerror(errno) << std::endl;
-	exit (1);
-    }
+    NEGCHECK("setsockopt", setsockopt(
+	socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
     set_flags(socketFD, O_WRONLY|O_NONBLOCK);
 
     // Prepare input file descriptor
     set_flags(0, O_NONBLOCK);
 
     // Copy!
-    auto bytes_processed = copyfd(0, socketFD, 64*1024);
+#ifdef VERBOSE
     std::cerr << bytes_processed << " copied" << std::endl;
+#else
+    copyfd(0, socketFD, 64*1024);
+#endif
 
     close(socketFD);
     return 0;
