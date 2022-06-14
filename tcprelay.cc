@@ -71,10 +71,10 @@ int main (int argc, char* argv[])
 
     // Copy!
 #ifdef VERBOSE
-    auto bytes_processed = copyfd(input_socket, output_socket, 64*1024);
+    auto bytes_processed = copyfd(input_socket, output_socket, 131072);
     std::cerr << bytes_processed << " copied" << std::endl;
 #else
-    copyfd(input_socket, output_socket, 64*1024);
+    copyfd(input_socket, output_socket, 131072);
 #endif
 
     close(output_socket);

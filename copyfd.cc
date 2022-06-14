@@ -114,6 +114,10 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 	    }
 	}
 
+        // Only block if really necessary
+        if (bytes_read  > 0) p_write_set = nullptr;
+        if (bytes_write > 0) p_read_set  = nullptr;
+
         if (p_read_set || p_write_set)
         {
             int select_return;
