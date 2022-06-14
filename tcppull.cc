@@ -20,7 +20,7 @@ int main (int argc, char* argv[])
 {
     if (argc != 3)
     {
-        std::cerr << "Usage: tcpput hostname portnum" << std::endl;
+        std::cerr << "Usage: pull hostname portnum" << std::endl;
 	exit(1);
     }
     const char* hostname = argv[1];
@@ -46,17 +46,17 @@ int main (int argc, char* argv[])
     int optval = 1;
     NEGCHECK("setsockopt", setsockopt(
 	socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
-    set_flags(socketFD, O_WRONLY|O_NONBLOCK);
+    set_flags(socketFD, O_RDONLY|O_NONBLOCK);
 
-    // Prepare input file descriptor
-    set_flags(0, O_NONBLOCK);
+    // Prepare output file descriptor
+    set_flags(1, O_NONBLOCK);
 
     // Copy!
 #ifdef VERBOSE
-    auto bytes_processed = copyfd(0, socketFD, 64*1024);
+    auto bytes_processed = copyfd(socketFD, 1, 64*1024);
     std::cerr << bytes_processed << " copied" << std::endl;
 #else
-    copyfd(0, socketFD, 64*1024);
+    copyfd(socketFD, 1, 64*1024);
 #endif
 
     close(socketFD);
