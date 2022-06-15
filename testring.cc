@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string>
-#include <pthread.h>
+#include <thread>
 #include <stdio.h>
 #include "posix_ringbufr.h"
 
@@ -28,9 +28,10 @@ static Posix_RingbufR<Dummy> rbuf (11, (verbose >= 1 ? true : false));
 #else
 static RingbufR<Dummy> rbuf (11);
 #endif
+static bool running = true;
 
-static void* Reader (void* arg);
-static void* Writer (void* arg);
+static void Reader ();
+static void Writer ();
 static void Usage_exit (int exit_val);
 
 int main (int argc, char* argv[])
@@ -56,47 +57,25 @@ int main (int argc, char* argv[])
 	}
         break;
     default:
+	run_seconds = 0; // silence compiler warning
         Usage_exit (0);
         break;
     }
     
-    pthread_t hReader, hWriter;
-    if (pthread_create (&hReader, NULL, Reader, NULL) != 0)
-    {
-        std::cerr << "pthread_create failed (1) " << strerror(errno) <<
-	             std::endl;
-	exit (1);
-    }
-    if (pthread_create (&hWriter, NULL, Writer, NULL) != 0)
-    {
-        std::cerr << "pthread_create failed (2) " << strerror(errno) <<
-	             std::endl;
-	exit (1);
-    }
-    
+    std::thread hReader (Reader);
+    std::thread hWriter (Writer);
     sleep (run_seconds);
-
-    if (pthread_cancel (hWriter) != 0)
-    {
-        std::cerr << "pthread_cancel failed (1) " << strerror(errno) <<
-	             std::endl;
-	exit (1);
-    }
-    if (pthread_cancel (hReader) != 0)
-    {
-        std::cerr << "pthread_cancel failed (2) " << strerror(errno) <<
-	             std::endl;
-	exit (1);
-    }
-
-    exit (0);
+    
+    running = false;
+    hWriter.join();
+    hReader.join();
 }
 
-static void* Writer (void* arg)
+static void Writer ()
 {
     static __thread int serial = 0;
 
-    while (true)
+    while (running)
     {
 	int write_usleep = (rand() % write_usleep_range) + 1;
 	usleep (write_usleep);
@@ -126,16 +105,14 @@ static void* Writer (void* arg)
 	        std::cout << "(missed opportunity push)" << std::endl;
 	}
     }
-    
-    return NULL;
 }
 
 
-static void* Reader (void* arg)
+static void Reader ()
 {
     static __thread int serial = 0;
 
-    while (true)
+    while (running)
     {
 	int read_usleep = (rand() % read_usleep_range) + 1;
         usleep (read_usleep);
@@ -170,8 +147,6 @@ static void* Reader (void* arg)
 	        std::cout << "(missed opportunity pop)" << std::endl;
 	}
     }
-
-    return NULL;
 }
 
 static void Usage_exit (int exit_val)

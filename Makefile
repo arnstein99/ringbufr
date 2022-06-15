@@ -1,5 +1,4 @@
 CCFLAGS += -std=c++20 -O -Wall -pthread
-LDFLAGS += -lpthread
 LINK.o = c++ $(LDFLAGS)
 COMPILE.cc = c++ -c $(CCFLAGS)
 
