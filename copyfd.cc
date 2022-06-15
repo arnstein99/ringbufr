@@ -1,4 +1,5 @@
 #include "copyfd.h"
+#include "miscutils.h"
 
 #include "ringbufr.h"
 #include <sys/select.h>
@@ -12,12 +13,6 @@
     do { \
         /* std::cerr << "checkpoint " << __LINE__ << std::endl; */ \
     } while (false)
-
-void errorexit(const char* message)
-{
-    std::cerr << message << ": " << strerror(errno) << std::endl;
-    exit(errno);
-}
 
 size_t copyfd(int readfd, int writefd, size_t chunk_size)
 {

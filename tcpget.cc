@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "copyfd.h"
+#include "miscutils.h"
 
 // #define VERBOSE
 
