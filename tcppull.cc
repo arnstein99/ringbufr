@@ -16,7 +16,7 @@ int main (int argc, char* argv[])
     if (argc != 3)
     {
         std::cerr << "Usage: pull hostname portnum" << std::endl;
-	exit(1);
+        exit(1);
     }
     const char* hostname = argv[1];
     const int port_num = std::stoi(argv[2]);

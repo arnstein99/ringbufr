@@ -43,21 +43,21 @@ int main (int argc, char* argv[])
         run_seconds = DEFAULT_RUN_SECONDS;
         break;
     case 2:
-	if (sscanf (argv[1], "%d", &run_seconds) != 1)
-	{
-	    std::cerr << "Illegal numeric expression \"" << argv[1] <<
-	                 "\"" << std::endl;
-	    exit (1);
-	}
-	if (run_seconds < 0)
-	{
-	    std::cerr << "Please enter a non-negative number or nothing" <<
-	                 std::endl;
+        if (sscanf (argv[1], "%d", &run_seconds) != 1)
+        {
+            std::cerr << "Illegal numeric expression \"" << argv[1] <<
+                         "\"" << std::endl;
+            exit (1);
+        }
+        if (run_seconds < 0)
+        {
+            std::cerr << "Please enter a non-negative number or nothing" <<
+                         std::endl;
             Usage_exit (1);
-	}
+        }
         break;
     default:
-	run_seconds = 0; // silence compiler warning
+        run_seconds = 0; // silence compiler warning
         Usage_exit (0);
         break;
     }
@@ -77,33 +77,33 @@ static void Writer ()
 
     while (running)
     {
-	int write_usleep = (rand() % write_usleep_range) + 1;
-	usleep (write_usleep);
-	size_t available;
-	Dummy* start;
-	rbuf.pushInquire(available, start);
-	if (available)
-	{
-	    start->serialNumber = ++serial;
-	    if (verbose >= 1)
-	    {
-		std::cout << "(will push " << serial << ")" << std::endl;
-	    }
-	    try
-	    {
-		rbuf.push(1);
-	    }
-	    catch (RingbufRFullException)
-	    {
-		std::cout << "Write failure " << serial << std::endl;
-		exit(1);
-	    }
-	}
-	else
-	{
-	    if (verbose >= 1)
-	        std::cout << "(missed opportunity push)" << std::endl;
-	}
+        int write_usleep = (rand() % write_usleep_range) + 1;
+        usleep (write_usleep);
+        size_t available;
+        Dummy* start;
+        rbuf.pushInquire(available, start);
+        if (available)
+        {
+            start->serialNumber = ++serial;
+            if (verbose >= 1)
+            {
+                std::cout << "(will push " << serial << ")" << std::endl;
+            }
+            try
+            {
+                rbuf.push(1);
+            }
+            catch (RingbufRFullException)
+            {
+                std::cout << "Write failure " << serial << std::endl;
+                exit(1);
+            }
+        }
+        else
+        {
+            if (verbose >= 1)
+                std::cout << "(missed opportunity push)" << std::endl;
+        }
     }
 }
 
@@ -114,38 +114,38 @@ static void Reader ()
 
     while (running)
     {
-	int read_usleep = (rand() % read_usleep_range) + 1;
-        usleep (read_usleep);
-	size_t available;
-	Dummy* start;
-	rbuf.popInquire(available, start);
-	if (available)
-	{
-	    ++serial;
-	    auto observed = start->serialNumber;
-	    if (verbose >= 1)
-		std::cout << "(will pop " << observed << ")" << std::endl;
-	    if (observed != serial)
-	    {
-		std::cout << "*** ERROR *** ";
-		std::cout << "Pop: expected " << serial << " got " <<
-		    observed << std::endl;
-	    }
-	    try
-	    {
-		rbuf.pop(1);
-	    }
-	    catch (RingbufREmptyException)
-	    {
-		std::cout << "Read failure " << serial << std::endl;
-		exit(1);
-	    }
-	}
-	else
-	{
-	    if (verbose >= 1)
-	        std::cout << "(missed opportunity pop)" << std::endl;
-	}
+        int read_usleep = (rand() % read_usleep_range) + 1;
+            usleep (read_usleep);
+        size_t available;
+        Dummy* start;
+        rbuf.popInquire(available, start);
+        if (available)
+        {
+            ++serial;
+            auto observed = start->serialNumber;
+            if (verbose >= 1)
+            std::cout << "(will pop " << observed << ")" << std::endl;
+            if (observed != serial)
+            {
+                std::cout << "*** ERROR *** ";
+                std::cout << "Pop: expected " << serial << " got " <<
+                    observed << std::endl;
+            }
+            try
+            {
+                rbuf.pop(1);
+            }
+            catch (RingbufREmptyException)
+            {
+                std::cout << "Read failure " << serial << std::endl;
+                exit(1);
+            }
+        }
+        else
+        {
+            if (verbose >= 1)
+                std::cout << "(missed opportunity pop)" << std::endl;
+        }
     }
 }
 

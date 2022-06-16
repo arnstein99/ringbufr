@@ -15,8 +15,7 @@ class Posix_RingbufR : public RingbufR<_T>
 public:
 
     Posix_RingbufR (size_t capacity, int verbose)
-        : RingbufR<_T> (capacity),
-	  _verbose(verbose)
+        : RingbufR<_T> (capacity), _verbose(verbose)
     {
     }
 
@@ -29,15 +28,15 @@ protected:
     void updateStart(size_t increment) override
     {
         auto lock = std::lock_guard(_mutex);
-	RingbufR<_T>::updateStart(increment);
-	dump("pop:");
+        RingbufR<_T>::updateStart(increment);
+        dump("pop:");
     }
 
     void updateEnd(size_t increment) override
     {
         auto lock = std::lock_guard(_mutex);
-	RingbufR<_T>::updateEnd(increment);
-	dump("push:");
+        RingbufR<_T>::updateEnd(increment);
+        dump("push:");
     }
 
 private:
@@ -45,12 +44,12 @@ private:
     void dump(const std::string& msg)
     {
         if (_verbose)
-	{
-	    std::cout << msg <<
-	        " next pop " << this->_pop_next - this->_ring_start <<
-	        " next push " << this->_push_next - this->_ring_start <<
-		" empty " << (this->_empty ? "true" : "false") << std::endl;
-	}
+        {
+            std::cout << msg <<
+                " next pop " << this->_pop_next - this->_ring_start <<
+                " next push " << this->_push_next - this->_ring_start <<
+            " empty " << (this->_empty ? "true" : "false") << std::endl;
+        }
     }
 
     std::mutex _mutex;

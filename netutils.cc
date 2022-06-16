@@ -22,7 +22,7 @@ int socket_from_address(const std::string& hostname, int port_number)
     // Not sure if this is required
     int optval = 1;
     NEGCHECK("setsockopt", setsockopt (
-	socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
+    socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
 
     // Process host name
     struct hostent* server = gethostbyname(hostname.c_str());
@@ -31,7 +31,7 @@ int socket_from_address(const std::string& hostname, int port_number)
     bzero((char *) &serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     bcopy((char *)server->h_addr,
-	(char *)&serveraddr.sin_addr.s_addr, server->h_length);
+    (char *)&serveraddr.sin_addr.s_addr, server->h_length);
     serveraddr.sin_port = htons(port_number);
 
     // Connect to server
@@ -59,7 +59,7 @@ int listening_socket(int port_number)
     NEGCHECK("listen", listen (socketFD, 10));
     int optval = 1;
     NEGCHECK("setsockopt", setsockopt (
-	socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
+    socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
     struct sockaddr_in addr;
     socklen_t addrlen = (socklen_t)sizeof(addr);
     int connectFD;

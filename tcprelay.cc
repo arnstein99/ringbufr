@@ -15,7 +15,7 @@ int main (int argc, char* argv[])
     if (argc != 3)
     {
         std::cerr << "Usage: tcprelay input_port output_port" << std::endl;
-	exit(1);
+        exit(1);
     }
     int input_port = std::stoi(argv[1]);
     int output_port = std::stoi(argv[2]);

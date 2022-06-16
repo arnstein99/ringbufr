@@ -12,7 +12,7 @@ void set_nonblock_flag(int fd)
     if (retval != 0)
     {
         std::cerr << "fcntl " << strerror(errno) << std::endl;
-	exit(retval);
+        exit(retval);
     }
 }
 
