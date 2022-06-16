@@ -1,6 +1,7 @@
 #include "netutils.h"
 #include "miscutils.h"
 
+#include <string.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <sys/socket.h>
