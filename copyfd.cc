@@ -1,4 +1,5 @@
 #include "copyfd.h"
+#include "miscutils.h"
 
 #include "ringbufr.h"
 #include <sys/select.h>
@@ -12,12 +13,6 @@
     do { \
         /* std::cerr << "checkpoint " << __LINE__ << std::endl; */ \
     } while (false)
-
-void errorexit(const char* message)
-{
-    std::cerr << message << ": " << strerror(errno) << std::endl;
-    exit(errno);
-}
 
 size_t copyfd(int readfd, int writefd, size_t chunk_size)
 {
@@ -34,17 +29,17 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
     size_t write_available;
     do
     {
-	fd_set* p_read_set = nullptr;
-	fd_set* p_write_set = nullptr;
+        fd_set* p_read_set = nullptr;
+        fd_set* p_write_set = nullptr;
 
-	unsigned char* read_start;
-	bufr.pushInquire(read_available, read_start);
+        unsigned char* read_start;
+        bufr.pushInquire(read_available, read_start);
         CHECKPOINT;
         bytes_read = 0;
-	if (read_available)
-	{
+        if (read_available)
+        {
             CHECKPOINT;
-	    read_available = std::min(read_available, chunk_size);
+            read_available = std::min(read_available, chunk_size);
             bytes_read = read(readfd, read_start, read_available);
             if (bytes_read < 0)
             {
@@ -71,33 +66,33 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
                 // Some data was input, no need to select.
                 bufr.push(bytes_read);
             }
-	}
+        }
 
-	bytes_write = 0;
-	unsigned char* write_start;
-	bufr.popInquire(write_available, write_start);
-	if (write_available)
-	{
+        bytes_write = 0;
+        unsigned char* write_start;
+        bufr.popInquire(write_available, write_start);
+        if (write_available)
+        {
             CHECKPOINT;
-	    bytes_write = write(writefd, write_start, write_available);
-	    if (bytes_write < 0)
-	    {
+            bytes_write = write(writefd, write_start, write_available);
+            if (bytes_write < 0)
+            {
                 CHECKPOINT;
-		if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
-		{
+                if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+                {
                     CHECKPOINT;
                     // This is when to select().
-		    FD_ZERO(&write_set);
-		    FD_SET(writefd, &write_set);
-		    p_write_set = &write_set;
-		}
-		else
-		{
+                    FD_ZERO(&write_set);
+                    FD_SET(writefd, &write_set);
+                    p_write_set = &write_set;
+                }
+                else
+                {
                     CHECKPOINT;
                     // Some other error on write
                     errorexit("write");
-		}
-	    }
+                }
+            }
             else if (bytes_write == 0)
             {
                 CHECKPOINT;
@@ -106,13 +101,13 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
                 exit(1);
             }
             else
-	    {
+            {
                 CHECKPOINT;
                 // Some data was output, no need to select.
-	        bufr.pop(bytes_write);
-		bytes_processed += bytes_write;
-	    }
-	}
+                bufr.pop(bytes_write);
+                bytes_processed += bytes_write;
+            }
+        }
 
         // Only block if really necessary
         if (bytes_read  > 0) p_write_set = nullptr;
@@ -127,11 +122,11 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
         }
 
 #ifdef VERBOSE
-    std::cerr << (p_read_set ? "<" : " ");
-	std::cerr << "read " << bytes_read << " ";
+    std::cerr << "read " << bytes_read << " " << " write " << bytes_write;
     std::cerr << " ";
-    std::cerr << (p_write_set ? ">" : " ");
-    std::cerr << "write " << bytes_write << std::endl;
+    std::cerr << (p_read_set  ? "x " : "| ");
+    std::cerr << (p_write_set ? "x " : "| ");
+    std::cerr << std::endl;
 #endif
 
     } while (bytes_read || bytes_write);

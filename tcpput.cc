@@ -6,46 +6,23 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "copyfd.h"
+#include "miscutils.h"
+#include "netutils.h"
 
 // #define VERBOSE
-
-void set_flags(int fd, int flags)
-{
-    int oldflags = fcntl(fd, F_GETFL, 0);
-    oldflags |= flags;
-    ZEROCHECK("fcntl", fcntl(fd, F_SETFL, oldflags));
-}
 
 int main (int argc, char* argv[])
 {
     if (argc != 3)
     {
         std::cerr << "Usage: tcpput hostname portnum" << std::endl;
-	exit(1);
+        exit(1);
     }
     const char* hostname = argv[1];
     const int port_num = std::stoi(argv[2]);
 
     // Create socket
-    int socketFD;
-    NEGCHECK("socket", (socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
-
-    // Process host name
-    struct hostent* server = gethostbyname(hostname);
-    if (server == NULL) errorexit("gethostbyname");
-    struct sockaddr_in serveraddr;
-    bzero((char *) &serveraddr, sizeof(serveraddr));
-    serveraddr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr,
-          (char *)&serveraddr.sin_addr.s_addr, server->h_length);
-    serveraddr.sin_port = htons(port_num);
-
-    // Connect to server
-    NEGCHECK ("connect", connect(
-        socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)));
-    int optval = 1;
-    NEGCHECK("setsockopt", setsockopt(
-	socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
+    int socketFD = socket_from_address(hostname, port_num);
     set_flags(socketFD, O_WRONLY|O_NONBLOCK);
 
     // Prepare input file descriptor

@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string>
-#include <pthread.h>
+#include <thread>
 #include <stdio.h>
 #include "posix_ringbufr.h"
 
@@ -28,9 +28,10 @@ static Posix_RingbufR<Dummy> rbuf (11, (verbose >= 1 ? true : false));
 #else
 static RingbufR<Dummy> rbuf (11);
 #endif
+static bool running = true;
 
-static void* Reader (void* arg);
-static void* Writer (void* arg);
+static void Reader ();
+static void Writer ();
 static void Usage_exit (int exit_val);
 
 int main (int argc, char* argv[])
@@ -42,136 +43,110 @@ int main (int argc, char* argv[])
         run_seconds = DEFAULT_RUN_SECONDS;
         break;
     case 2:
-	if (sscanf (argv[1], "%d", &run_seconds) != 1)
-	{
-	    std::cerr << "Illegal numeric expression \"" << argv[1] <<
-	                 "\"" << std::endl;
-	    exit (1);
-	}
-	if (run_seconds < 0)
-	{
-	    std::cerr << "Please enter a non-negative number or nothing" <<
-	                 std::endl;
+        if (sscanf (argv[1], "%d", &run_seconds) != 1)
+        {
+            std::cerr << "Illegal numeric expression \"" << argv[1] <<
+                         "\"" << std::endl;
+            exit (1);
+        }
+        if (run_seconds < 0)
+        {
+            std::cerr << "Please enter a non-negative number or nothing" <<
+                         std::endl;
             Usage_exit (1);
-	}
+        }
         break;
     default:
+        run_seconds = 0; // silence compiler warning
         Usage_exit (0);
         break;
     }
     
-    pthread_t hReader, hWriter;
-    if (pthread_create (&hReader, NULL, Reader, NULL) != 0)
-    {
-        std::cerr << "pthread_create failed (1) " << strerror(errno) <<
-	             std::endl;
-	exit (1);
-    }
-    if (pthread_create (&hWriter, NULL, Writer, NULL) != 0)
-    {
-        std::cerr << "pthread_create failed (2) " << strerror(errno) <<
-	             std::endl;
-	exit (1);
-    }
-    
+    std::thread hReader (Reader);
+    std::thread hWriter (Writer);
     sleep (run_seconds);
-
-    if (pthread_cancel (hWriter) != 0)
-    {
-        std::cerr << "pthread_cancel failed (1) " << strerror(errno) <<
-	             std::endl;
-	exit (1);
-    }
-    if (pthread_cancel (hReader) != 0)
-    {
-        std::cerr << "pthread_cancel failed (2) " << strerror(errno) <<
-	             std::endl;
-	exit (1);
-    }
-
-    exit (0);
-}
-
-static void* Writer (void* arg)
-{
-    static __thread int serial = 0;
-
-    while (true)
-    {
-	int write_usleep = (rand() % write_usleep_range) + 1;
-	usleep (write_usleep);
-	size_t available;
-	Dummy* start;
-	rbuf.pushInquire(available, start);
-	if (available)
-	{
-	    start->serialNumber = ++serial;
-	    if (verbose >= 1)
-	    {
-		std::cout << "(will push " << serial << ")" << std::endl;
-	    }
-	    try
-	    {
-		rbuf.push(1);
-	    }
-	    catch (RingbufRFullException)
-	    {
-		std::cout << "Write failure " << serial << std::endl;
-		exit(1);
-	    }
-	}
-	else
-	{
-	    if (verbose >= 1)
-	        std::cout << "(missed opportunity push)" << std::endl;
-	}
-    }
     
-    return NULL;
+    running = false;
+    hWriter.join();
+    hReader.join();
 }
 
-
-static void* Reader (void* arg)
+static void Writer ()
 {
     static __thread int serial = 0;
 
-    while (true)
+    while (running)
     {
-	int read_usleep = (rand() % read_usleep_range) + 1;
-        usleep (read_usleep);
-	size_t available;
-	Dummy* start;
-	rbuf.popInquire(available, start);
-	if (available)
-	{
-	    ++serial;
-	    auto observed = start->serialNumber;
-	    if (verbose >= 1)
-		std::cout << "(will pop " << observed << ")" << std::endl;
-	    if (observed != serial)
-	    {
-		std::cout << "*** ERROR *** ";
-		std::cout << "Pop: expected " << serial << " got " <<
-		    observed << std::endl;
-	    }
-	    try
-	    {
-		rbuf.pop(1);
-	    }
-	    catch (RingbufREmptyException)
-	    {
-		std::cout << "Read failure " << serial << std::endl;
-		exit(1);
-	    }
-	}
-	else
-	{
-	    if (verbose >= 1)
-	        std::cout << "(missed opportunity pop)" << std::endl;
-	}
+        int write_usleep = (rand() % write_usleep_range) + 1;
+        usleep (write_usleep);
+        size_t available;
+        Dummy* start;
+        rbuf.pushInquire(available, start);
+        if (available)
+        {
+            start->serialNumber = ++serial;
+            if (verbose >= 1)
+            {
+                std::cout << "(will push " << serial << ")" << std::endl;
+            }
+            try
+            {
+                rbuf.push(1);
+            }
+            catch (RingbufRFullException)
+            {
+                std::cout << "Write failure " << serial << std::endl;
+                exit(1);
+            }
+        }
+        else
+        {
+            if (verbose >= 1)
+                std::cout << "(missed opportunity push)" << std::endl;
+        }
     }
+}
 
-    return NULL;
+
+static void Reader ()
+{
+    static __thread int serial = 0;
+
+    while (running)
+    {
+        int read_usleep = (rand() % read_usleep_range) + 1;
+            usleep (read_usleep);
+        size_t available;
+        Dummy* start;
+        rbuf.popInquire(available, start);
+        if (available)
+        {
+            ++serial;
+            auto observed = start->serialNumber;
+            if (verbose >= 1)
+            std::cout << "(will pop " << observed << ")" << std::endl;
+            if (observed != serial)
+            {
+                std::cout << "*** ERROR *** ";
+                std::cout << "Pop: expected " << serial << " got " <<
+                    observed << std::endl;
+            }
+            try
+            {
+                rbuf.pop(1);
+            }
+            catch (RingbufREmptyException)
+            {
+                std::cout << "Read failure " << serial << std::endl;
+                exit(1);
+            }
+        }
+        else
+        {
+            if (verbose >= 1)
+                std::cout << "(missed opportunity pop)" << std::endl;
+        }
+    }
 }
 
 static void Usage_exit (int exit_val)
