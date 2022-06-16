@@ -122,11 +122,11 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
         }
 
 #ifdef VERBOSE
-    std::cerr << (p_read_set ? "<" : " ");
-	std::cerr << "read " << bytes_read << " ";
+    std::cerr << "read " << bytes_read << " " << " write " << bytes_write;
     std::cerr << " ";
-    std::cerr << (p_write_set ? ">" : " ");
-    std::cerr << "write " << bytes_write << std::endl;
+    std::cerr << (p_read_set  ? "x " : "| ");
+    std::cerr << (p_write_set ? "x " : "| ");
+    std::cerr << std::endl;
 #endif
 
     } while (bytes_read || bytes_write);
