@@ -10,9 +10,13 @@
 
 // #define VERBOSE
 
-// socket will be -1 if user wants to use stdin or stdout.
-void
-process_args(int& argc, char** argv, bool& listening, int& socket);
+struct Uri
+{
+    bool listening;
+    int port;                // -1 means stdin or stdout
+    std::string hostname;    // Not always defined
+};
+static Uri process_args(int& argc, char**& argv);
 
 static void usage_error();
 
@@ -22,15 +26,65 @@ int main (int argc, char* argv[])
     int argc_copy = argc - 1;
     char** argv_copy = argv;
     ++argv_copy;
-    bool input_listening, output_listening;
-    int input_socket, output_socket;
-    process_args(argc_copy, argv_copy, input_listening , input_socket );
-    process_args(argc_copy, argv_copy, output_listening, output_socket);
+    auto input_uri  = process_args(argc_copy, argv_copy);
+    auto output_uri = process_args(argc_copy, argv_copy);
     if (argc_copy != 0) usage_error();
 
-    // Special case for local I/O
-    if (input_socket  == -1) input_socket  = 0;
-    if (output_socket == -1) output_socket = 1;
+    // Special processing for double listen
+    int input_socket=0, output_socket=0;
+    if (input_uri.listening && output_uri.listening)
+    {
+        // wait for both URIs to accept
+        double_listen(
+            input_uri.port, output_uri.port, input_socket, output_socket);
+    }
+    else if (input_uri.listening)
+    {
+        input_socket = listening_socket(input_uri.port);
+        if (output_uri.port == -1)
+        {
+            output_socket = 1;
+        }
+        else
+        {
+            output_socket =
+                socket_from_address(output_uri.hostname, output_uri.port);
+        }
+    }
+    else if (output_uri.listening)
+    {
+        output_socket = listening_socket(output_uri.port);
+        if (input_uri.port == -1)
+        {
+            input_socket = 0;
+        }
+        else
+        {
+            input_socket =
+                socket_from_address(input_uri.hostname, input_uri.port);
+        }
+    }
+    else // no listening
+    {
+        if (input_uri.port == -1)
+        {
+            input_socket = 0;
+        }
+        else
+        {
+            input_socket =
+                socket_from_address(input_uri.hostname, input_uri.port);
+        }
+        if (output_uri.port == -1)
+        {
+            output_socket = 1;
+        }
+        else
+        {
+            output_socket =
+                socket_from_address(output_uri.hostname, output_uri.port);
+        }
+    }
 
     // Modify port properties
     set_flags(input_socket, O_NONBLOCK|O_RDONLY);
@@ -49,51 +103,51 @@ int main (int argc, char* argv[])
     return 0;
 }
 
-void
-process_args(int& argc, char** argv, bool& listening, int& socket)
+static Uri process_args(int& argc, char**& argv)
+// Group can be one of
+//     -pipe
+//     -listen <port
+//     -connect <hostname> <port>
 {
+    Uri uri;
+
     if (argc < 1) usage_error();
     const char* option = argv[0];
     ++argv;
     --argc;
-    if (argc < 1) usage_error();
-    const char* value = argv[0];
-    --argc;
-    ++argv;
-    if (strcmp(option, "-listen") == 0)
+
+    if (strcmp(option, "-pipe") == 0)
     {
-        listening = true;
-        if (strcmp(value, "pipe") == 0)
-        {
-            socket = -1;
-        }
-        else
-        {
-            int port = std::stoi(value);
-            socket = listening_socket(port);
-        }
+        uri.listening = false;
+        uri.port = -1;
+    }
+    else if (strcmp(option, "-listen") == 0)
+    {
+        uri.listening = true;
+        if (argc < 1) usage_error();
+        const char* value = argv[0];
+        ++argv;
+        --argc;
+        uri.port = std::stoi(value);
     }
     else if (strcmp(option, "-connect") == 0)
     {
-        listening = false;
-        if (strcmp(value, "pipe") == 0)
-        {
-            socket = -1;
-        }
-        else
-        {
-            const char* hostname = value;
-            if (argc < 1) usage_error();
-            --argc;
-            ++argv;
-            int port = std::stoi(argv[0]);
-            socket = socket_from_address(hostname, port);
-        }
+        uri.listening = false;
+        if (argc < 1) usage_error();
+        const char* value = argv[0];
+        --argc;
+        ++argv;
+        uri.hostname = value;
+        if (argc < 1) usage_error();
+        uri.port = std::stoi(argv[0]);
+        --argc;
+        ++argv;
     }
     else
     {
         usage_error();
     }
+    return uri;
 }
 
 void usage_error()
