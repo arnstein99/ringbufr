@@ -74,6 +74,7 @@ int listening_socket(int port_number)
     int connectFD;
     NEGCHECK("accept", (connectFD = accept(
         socketFD, (struct sockaddr*)(&addr), &addrlen)));
+    close(socketFD);
 #ifdef VERBOSE
     std::cerr << "connected" << std::endl;
 #endif
@@ -153,6 +154,7 @@ void double_listen(
                 std::cerr << "accepted on input socket " << socketFD_in <<
                 std::endl;
             }
+            close(socketFD_in);
 #endif
         }
 
@@ -180,6 +182,7 @@ void double_listen(
                 std::cerr << "accepted on output socket " << socketFD_out <<
                 std::endl;
             }
+            close(socketFD_out);
 #endif
         }
 
