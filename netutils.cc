@@ -111,7 +111,7 @@ void double_listen(
         socketFD_out, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
 
     // Get both sockets accepted
-    int connectFD_in, connectFD_out;
+    int connectFD_in = -1, connectFD_out = -1;
     do
     {
         struct sockaddr_in addr;
@@ -121,36 +121,43 @@ void double_listen(
         FD_ZERO(&read_set);
         int maxfd = std::max(socketFD_in, socketFD_out) + 1;
 
-        connectFD_in = accept(socketFD_in, (struct sockaddr*)(&addr), &addrlen);
         if (connectFD_in < 0)
         {
-            if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+            connectFD_in =
+                accept(socketFD_in, (struct sockaddr*)(&addr), &addrlen);
+            if (connectFD_in < 0)
             {
-                // This is when to select()
-                FD_SET(socketFD_in, &read_set);
-                p_read_set = &read_set;
-            }
-            else
-            {
-                // Some other error on input
-                errorexit("accept");
+                if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+                {
+                    // This is when to select()
+                    FD_SET(socketFD_in, &read_set);
+                    p_read_set = &read_set;
+                }
+                else
+                {
+                    // Some other error on input
+                    errorexit("accept");
+                }
             }
         }
 
-        connectFD_out =
-            accept(socketFD_out, (struct sockaddr*)(&addr), &addrlen);
         if (connectFD_out < 0)
         {
-            if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+            connectFD_out =
+                accept(socketFD_out, (struct sockaddr*)(&addr), &addrlen);
+            if (connectFD_out < 0)
             {
-                // This is when to select()
-                FD_SET(socketFD_out, &read_set);
-                p_read_set = &read_set;
-            }
-            else
-            {
-                // Some other error on input
-                errorexit("accept");
+                if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+                {
+                    // This is when to select()
+                    FD_SET(socketFD_out, &read_set);
+                    p_read_set = &read_set;
+                }
+                else
+                {
+                    // Some other error on input
+                    errorexit("accept");
+                }
             }
         }
 
