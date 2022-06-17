@@ -7,6 +7,11 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+// #define VERBOSE
+#ifdef VERBOSE
+#include <iostream>
+#endif
+
 void set_flags(int fd, int flags)
 {
     int oldflags = fcntl(fd, F_GETFL, 0);
@@ -38,6 +43,9 @@ int socket_from_address(const std::string& hostname, int port_number)
     // Connect to server
     NEGCHECK ("connect", connect(
         socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)));
+#ifdef VERBOSE
+    std::cerr << "connected socket " << socketFD << std::endl;
+#endif
 
     return socketFD;
 }
@@ -74,7 +82,7 @@ int listening_socket(int port_number)
 }
 
 void double_listen(
-    int input_port, int output_port, int input_socket, int output_socket)
+    int input_port, int output_port, int& input_socket, int& output_socket)
 {
     // Create listening sockets
     int socketFD_in;
@@ -139,6 +147,13 @@ void double_listen(
                     errorexit("accept");
                 }
             }
+#ifdef VERBOSE
+            else
+            {
+                std::cerr << "accepted on input socket " << socketFD_in <<
+                std::endl;
+            }
+#endif
         }
 
         if (connectFD_out < 0)
@@ -159,6 +174,13 @@ void double_listen(
                     errorexit("accept");
                 }
             }
+#ifdef VERBOSE
+            else
+            {
+                std::cerr << "accepted on output socket " << socketFD_out <<
+                std::endl;
+            }
+#endif
         }
 
         if (p_read_set)
@@ -170,4 +192,9 @@ void double_listen(
         }
 
     } while ((connectFD_in < 0) || (connectFD_out < 0));
+#ifdef VERBOSE
+    std::cerr << "finished accepts" << std::endl;
+#endif
+    input_socket  = connectFD_in;
+    output_socket = connectFD_out;
 }

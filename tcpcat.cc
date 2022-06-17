@@ -92,6 +92,8 @@ int main (int argc, char* argv[])
 
     // Copy!
 #ifdef VERBOSE
+    std::cerr << "starting copy, socket " << input_socket <<
+        " to socket " << output_socket << std::endl;
     auto bytes_processed = copyfd(input_socket, output_socket, 131072);
     std::cerr << bytes_processed << " copied" << std::endl;
 #else
@@ -152,7 +154,11 @@ static Uri process_args(int& argc, char**& argv)
 
 void usage_error()
 {
-    // Later
-    std::cerr << "Usage error" << std::endl;
+    std::cerr << "Usage: tcpcat <input_spec> <output_spec>" << std::endl;
+    std::cerr << "Each of <input_spec> and <output_spec> can be one of" <<
+        std::endl;
+    std::cerr << "    -pipe" << std::endl;
+    std::cerr << "    -listen <port_number>" << std::endl;
+    std::cerr << "    -connect <hostname> <port_number>" << std::endl;
     exit (1);
 }
