@@ -25,11 +25,6 @@ int socket_from_address(const std::string& hostname, int port_number)
     int socketFD;
     NEGCHECK("socket", (socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
 
-    // Not sure if this is required
-    int optval = 1;
-    NEGCHECK("setsockopt", setsockopt (
-        socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
-
     // Process host name
     struct hostent* server = gethostbyname(hostname.c_str());
     if (server == NULL) errorexit("gethostbyname");
@@ -65,11 +60,7 @@ int listening_socket(int port_number)
         (bind (socketFD, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa))));
 
     // Get a client
-    NEGCHECK("listen", listen (socketFD, 10));
-    // Not sure if this is required
-    int optval = 1;
-    NEGCHECK("setsockopt", setsockopt (
-        socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
+    NEGCHECK("listen", listen (socketFD, 1));
     struct sockaddr_in addr;
     socklen_t addrlen = (socklen_t)sizeof(addr);
     int connectFD;
@@ -112,13 +103,8 @@ void double_listen(
     set_flags(socketFD_out, O_NONBLOCK);
 
     // Mark both sockets for listening
-    int optval = 1;
-    NEGCHECK("listen", listen (socketFD_in, 10));
-    NEGCHECK("setsockopt", setsockopt (
-        socketFD_in, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
-    NEGCHECK("listen", listen (socketFD_out, 10));
-    NEGCHECK("setsockopt", setsockopt (
-        socketFD_out, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
+    NEGCHECK("listen", listen (socketFD_in,  1));
+    NEGCHECK("listen", listen (socketFD_out, 1));
 
     // Get both sockets accepted
     int connectFD_in = -1, connectFD_out = -1;
