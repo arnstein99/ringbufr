@@ -6,9 +6,9 @@
 #include <algorithm>
 #include <cstring>
 #include <unistd.h>
+#include <iostream>
 
 #ifdef VERBOSE
-#include <iostream>
 #include <iomanip>
 #include <chrono>
 using namespace std::chrono;
