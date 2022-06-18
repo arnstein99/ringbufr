@@ -8,7 +8,7 @@
 #include "miscutils.h"
 #include "netutils.h"
 
-// #define VERBOSE
+#define VERBOSE
 
 struct Uri
 {

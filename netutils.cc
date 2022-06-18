@@ -66,6 +66,7 @@ int listening_socket(int port_number)
 
     // Get a client
     NEGCHECK("listen", listen (socketFD, 10));
+    // Not sure if this is required
     int optval = 1;
     NEGCHECK("setsockopt", setsockopt (
         socketFD, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)));
