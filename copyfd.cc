@@ -5,10 +5,11 @@
 #include <sys/select.h>
 #include <algorithm>
 #include <cstring>
-#include <iostream>
 #include <unistd.h>
 
 #ifdef VERBOSE
+#include <iostream>
+#include <iomanip>
 #include <chrono>
 using namespace std::chrono;
 #endif // VERBOSE
@@ -143,14 +144,21 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
 
 #ifdef VERBOSE
     if (read_available)
-        std::cerr << "read " << bytes_read;
+    {
+        std::cerr << std::setw(7) << std::left << "read" <<
+            std::setw(6) << std::right << bytes_read;
+    }
     else
-        std::cerr << "        ";
+        std::cerr << std::setw(13) << " ";
+    std::cerr << "    ";
     if (write_available)
-        std::cerr << " " << " write " << bytes_write;
+    {
+        std::cerr << std::setw(7) << std::left << "write" <<
+            std::setw(6) << std::right << bytes_write;
+    }
     else
-        std::cerr << " " << "         ";
-    std::cerr << " ";
+        std::cerr << std::setw(13) << "  ";
+    std::cerr << "    ";
     std::cerr << (p_read_set  ? "x" : "|");
     std::cerr << (p_write_set ? "x" : "|");
     std::cerr << std::endl;
