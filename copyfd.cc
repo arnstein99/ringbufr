@@ -8,7 +8,11 @@
 #include <iostream>
 #include <unistd.h>
 
-// #define VERBOSE
+#ifdef VERBOSE
+#include <chrono>
+using namespace std::chrono;
+#endif // VERBOSE
+
 #define CHECKPOINT \
     do { \
         /* std::cerr << "checkpoint " << __LINE__ << std::endl; */ \
@@ -39,8 +43,16 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
         if (read_available)
         {
             CHECKPOINT;
+#ifdef VERBOSE
             read_available = std::min(read_available, chunk_size);
+            auto before = system_clock::now();
+#endif // VERBOSE
             bytes_read = read(readfd, read_start, read_available);
+#ifdef VERBOSE
+            auto after = system_clock::now();
+            auto dur = duration_cast<milliseconds>(after - before).count();
+            std::cerr << "read time " << dur << std::endl;
+#endif // VERBOSE
             if (bytes_read < 0)
             {
                 if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
@@ -74,7 +86,15 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
         if (write_available)
         {
             CHECKPOINT;
+#ifdef VERBOSE
+            auto before = system_clock::now();
+#endif // VERBOSE
             bytes_write = write(writefd, write_start, write_available);
+#ifdef VERBOSE
+            auto after = system_clock::now();
+            auto dur = duration_cast<milliseconds>(after - before).count();
+            std::cerr << "write time " << dur << std::endl;
+#endif // VERBOSE
             if (bytes_write < 0)
             {
                 CHECKPOINT;
@@ -122,10 +142,17 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size)
         }
 
 #ifdef VERBOSE
-    std::cerr << "read " << bytes_read << " " << " write " << bytes_write;
+    if (read_available)
+        std::cerr << "read " << bytes_read;
+    else
+        std::cerr << "        ";
+    if (write_available)
+        std::cerr << " " << " write " << bytes_write;
+    else
+        std::cerr << " " << "         ";
     std::cerr << " ";
-    std::cerr << (p_read_set  ? "x " : "| ");
-    std::cerr << (p_write_set ? "x " : "| ");
+    std::cerr << (p_read_set  ? "x" : "|");
+    std::cerr << (p_write_set ? "x" : "|");
     std::cerr << std::endl;
 #endif
 
