@@ -1,9 +1,14 @@
+ifneq ($(strip $(VERBOSE)),)
+    CPPFLAGS += -DVERBOSE
+endif
 CCFLAGS += -std=c++2a -g -Wall
 LDLIBS += -lpthread
 LINK.o = c++ $(LDFLAGS)
-COMPILE.cc = c++ -c $(CCFLAGS)
+COMPILE.cc = c++ -c $(CCFLAGS) $(CPPFLAGS)
 
-all: testring ringcat tcpget tcpput tcprelay tcppull tcppush tcpcat
+normal: testring tcpcat
+obsolete: ringcat tcpget tcpput tcprelay tcppull tcppush
+all: normal obsolete
 
 testring: testring.o
 ringcat: ringcat.o copyfd.o miscutils.o

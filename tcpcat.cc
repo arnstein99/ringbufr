@@ -8,8 +8,6 @@
 #include "miscutils.h"
 #include "netutils.h"
 
-#define VERBOSE
-
 struct Uri
 {
     bool listening;
