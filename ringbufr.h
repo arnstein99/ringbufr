@@ -26,7 +26,7 @@ class RingbufR
 {
 public:
 
-    RingbufR (size_t capacity);
+    RingbufR (size_t capacity, size_t edge_guard = 0);
     virtual ~RingbufR ();
     RingbufR() = delete; // No default constructor
     RingbufR(const RingbufR<_T>&) = delete; // No copy constructor
@@ -42,11 +42,18 @@ protected:
     virtual void updateEnd(size_t increment);
 
     const size_t _capacity;
+    const size_t _edge_guard;
+    _T* const _edge_start;
     _T* const _ring_start;
     _T* const _ring_end;
+    _T* const _edge_end;
     bool _empty;
     _T* _push_next;
     _T* _pop_next;
+
+private:
+
+    size_t compute_move(size_t& guard_available) const;
 };
 
 // Implementation

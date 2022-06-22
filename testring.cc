@@ -6,14 +6,18 @@
 #include <string>
 #include <thread>
 #include <stdio.h>
+#include <mutex>
 #include "posix_ringbufr.h"
 
 // Tuning
 static const int read_usleep_range = 1000000;
 static const int write_usleep_range = 1000000;
-static const int verbose = 0;
-#define USE_POSIX
+static const int buffer_size = 37;
+static const int guard_size = 0; // 7
+static const int verbose = 1;
+// #define USE_POSIX
 #define DEFAULT_RUN_SECONDS 300
+std::mutex _mutex;
 
 class Dummy
 {
@@ -24,9 +28,9 @@ public:
 };
 
 #ifdef USE_POSIX
-static Posix_RingbufR<Dummy> rbuf (11, (verbose >= 1 ? true : false));
+static Posix_RingbufR<Dummy> rbuf(buffer_size, verbose, guard_size);
 #else
-static RingbufR<Dummy> rbuf (11);
+static RingbufR<Dummy> rbuf (buffer_size, guard_size);
 #endif
 static bool running = true;
 
@@ -81,28 +85,34 @@ static void Writer ()
         usleep (write_usleep);
         size_t available;
         Dummy* start;
+        auto lock = std::lock_guard(_mutex);
         rbuf.pushInquire(available, start);
         if (available)
         {
-            start->serialNumber = ++serial;
+            size_t count = 1;
+            if (available > 1)
+                count = (rand() % (available-1)) + 1;
             if (verbose >= 1)
+                std::cout << "(pushing " << count << ":";
+            size_t i = count;
+            while (i-- > 0)
             {
-                std::cout << "(will push " << serial << ")" << std::endl;
+                start->serialNumber = ++serial;
+                if (verbose >= 1)
+                    std::cout << " " << serial;
+                ++start;
             }
+            if (verbose >= 1)
+                std::cout << std::endl;
             try
             {
-                rbuf.push(1);
+                rbuf.push(count);
             }
             catch (RingbufRFullException)
             {
-                std::cout << "Write failure " << serial << std::endl;
+                std::cout << "Write failure" << std::endl;
                 exit(1);
             }
-        }
-        else
-        {
-            if (verbose >= 1)
-                std::cout << "(missed opportunity push)" << std::endl;
         }
     }
 }
@@ -112,39 +122,48 @@ static void Reader ()
 {
     static __thread int serial = 0;
 
-    while (running)
+    while (true)
     {
         int read_usleep = (rand() % read_usleep_range) + 1;
-            usleep (read_usleep);
+        usleep (read_usleep);
         size_t available;
         Dummy* start;
+        auto lock = std::lock_guard(_mutex);
         rbuf.popInquire(available, start);
         if (available)
         {
-            ++serial;
-            auto observed = start->serialNumber;
+            ssize_t count = 1;
+            if (available > 1)
+                count = (rand() % (available-1)) + 1;
             if (verbose >= 1)
-            std::cout << "(will pop " << observed << ")" << std::endl;
-            if (observed != serial)
+                std::cout << "(will pop " << count << ")" << std::endl;
+            ssize_t i = count;
+            while (i-- > 0)
             {
-                std::cout << "*** ERROR *** ";
-                std::cout << "Pop: expected " << serial << " got " <<
-                    observed << std::endl;
+                ++serial;
+                auto observed = start->serialNumber;
+                if (observed != serial)
+                {
+                    std::cout << "*** ERROR *** ";
+                    std::cout << "Pop: expected " << serial << " got " <<
+                        observed << std::endl;
+                    exit(1);
+                }
+                ++start;
             }
             try
             {
-                rbuf.pop(1);
+                rbuf.pop(count);
             }
             catch (RingbufREmptyException)
             {
-                std::cout << "Read failure " << serial << std::endl;
+                std::cout << "Read failure " << std::endl;
                 exit(1);
             }
         }
-        else
+        else if (!running)
         {
-            if (verbose >= 1)
-                std::cout << "(missed opportunity pop)" << std::endl;
+            break;
         }
     }
 }
