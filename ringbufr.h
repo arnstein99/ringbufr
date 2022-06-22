@@ -53,7 +53,7 @@ protected:
 
 private:
 
-    size_t compute_move(size_t& guard_available) const;
+    size_t compute_right() const;
 };
 
 // Implementation

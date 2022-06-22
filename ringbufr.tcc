@@ -24,9 +24,9 @@ RingbufR<_T>::~RingbufR()
 }
 
 template<typename _T>
-size_t RingbufR<_T>::compute_move(size_t& guard_available) const
+size_t RingbufR<_T>::compute_right() const
 {
-    guard_available = 0;
+    size_t guard_available = 0;
     size_t available = _ring_end - _push_next;
     if (available < _edge_guard)
     {
@@ -35,10 +35,9 @@ size_t RingbufR<_T>::compute_move(size_t& guard_available) const
             guard_available = _pop_next - _ring_start;
             std::size_t excess = _edge_guard - available;
             guard_available = std::min(guard_available, excess);
-            available += guard_available;
         }
     }
-    return available;
+    return guard_available;
 }
 
 template<typename _T>
@@ -60,8 +59,7 @@ void RingbufR<_T>::pushInquire(size_t& available, _T*& start) const
     }
     else
     {
-        size_t guard_available;
-        available = compute_move(guard_available);
+        available = (_ring_end - _push_next) + compute_right();
     }
     start = _push_next;
 }
@@ -88,8 +86,8 @@ void RingbufR<_T>::updateEnd(size_t increment)
     }
     else
     {
-        size_t available = compute_move(guard_available);
-        limit = _push_next + available;
+        guard_available = compute_right();
+        limit = _ring_end + guard_available;
     }
     _push_next += increment;
     if (_push_next > limit)
@@ -99,13 +97,14 @@ void RingbufR<_T>::updateEnd(size_t increment)
     }
 
     // Wrap-around could begin here
-    if (guard_available > 0)
+    if (_push_next > _ring_end)
     {
+        size_t excess = _push_next - _ring_end;
         // Move excess data to start
-        _push_next = _ring_start + guard_available;
+        _push_next = _ring_start + excess;
         _T* source = _ring_end;
         _T* dest   = _ring_start;
-        while (guard_available--)
+        while (excess--)
             *dest++ = *source++;
     }
     if (_push_next == _ring_end) _push_next = _ring_start;
@@ -151,16 +150,14 @@ void RingbufR<_T>::updateStart(size_t increment)
 
     _T* limit;
     _T* new_next = _pop_next + increment;
-#ifdef LATER
     size_t stub_data = 0;
-#endif
     if (_push_next <= _pop_next)
     {
         // Wrap around is in effect
         limit = _ring_end;
-#ifdef LATER
         stub_data = _ring_end - new_next;
-#endif
+        // Debug code
+        stub_data = 0;
     }
     else
     {
@@ -172,9 +169,9 @@ void RingbufR<_T>::updateStart(size_t increment)
         throw RingbufREmptyException();
     }
 
-#ifdef LATER
     // Edge guard: move data from end of buffer.
-    if (stub_data < _edge_guard)
+    // TODO: check for previous move already in effect?
+    if (stub_data && (stub_data < _edge_guard))
     {
         _T* source = new_next;
         new_next = _ring_start - stub_data;
@@ -182,7 +179,6 @@ void RingbufR<_T>::updateStart(size_t increment)
         while (stub_data-- > 0)
             *dest++ = *source++;
     }
-#endif
 
     if (new_next == _ring_end) new_next = _ring_start;
     _pop_next = new_next;

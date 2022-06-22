@@ -10,13 +10,14 @@
 #include "posix_ringbufr.h"
 
 // Tuning
-static const int read_usleep_range = 1000000;
+static const int read_usleep_range  = 1000000;
 static const int write_usleep_range = 1000000;
 static const int buffer_size = 37;
-static const int guard_size = 0; // 7
+static const int guard_size = 7;
 static const int verbose = 1;
 // #define USE_POSIX
 #define DEFAULT_RUN_SECONDS 300
+
 std::mutex _mutex;
 
 class Dummy
@@ -26,6 +27,7 @@ public:
     double doubleMember;
     char stringMember[32];
 };
+Dummy* buffer;
 
 #ifdef USE_POSIX
 static Posix_RingbufR<Dummy> rbuf(buffer_size, verbose, guard_size);
@@ -65,6 +67,9 @@ int main (int argc, char* argv[])
         Usage_exit (0);
         break;
     }
+    // Cheat
+    size_t available;
+    rbuf.pushInquire(available, buffer);
     
     std::thread hReader (Reader);
     std::thread hWriter (Writer);
@@ -93,17 +98,17 @@ static void Writer ()
             if (available > 1)
                 count = (rand() % (available-1)) + 1;
             if (verbose >= 1)
-                std::cout << "(pushing " << count << ":";
+            {
+                std::cout << "(pushing " << count <<
+                    " at " << start - buffer <<
+                    " starting with value " << serial + 1 << ")" << std::endl;
+            }
             size_t i = count;
             while (i-- > 0)
             {
                 start->serialNumber = ++serial;
-                if (verbose >= 1)
-                    std::cout << " " << serial;
                 ++start;
             }
-            if (verbose >= 1)
-                std::cout << std::endl;
             try
             {
                 rbuf.push(count);
@@ -136,7 +141,8 @@ static void Reader ()
             if (available > 1)
                 count = (rand() % (available-1)) + 1;
             if (verbose >= 1)
-                std::cout << "(will pop " << count << ")" << std::endl;
+                std::cout << "(will pop " << count <<
+                " starting at " << start - buffer << ")" << std::endl;
             ssize_t i = count;
             while (i-- > 0)
             {
@@ -146,7 +152,7 @@ static void Reader ()
                 {
                     std::cout << "*** ERROR *** ";
                     std::cout << "Pop: expected " << serial << " got " <<
-                        observed << std::endl;
+                        observed << " offset " << i << std::endl;
                     exit(1);
                 }
                 ++start;
