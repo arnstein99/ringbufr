@@ -2,6 +2,8 @@
 
 #include <cassert>
 #include <algorithm>
+// Debug code
+#include <iostream>
 
 template<typename _T>
 RingbufR<_T>::RingbufR (size_t capacity, size_t edge_guard)
@@ -37,19 +39,31 @@ size_t RingbufR<_T>::compute_right() const
             guard_available = std::min(guard_available, excess);
         }
     }
+    // Debug code
+    guard_available = 0;
     return guard_available;
 }
 
 template<typename _T>
 void RingbufR<_T>::pushInquire(size_t& available, _T*& start) const
 {
-    // Take care of a special case
-    if (!_empty && (_push_next == _pop_next))
+    // Take care of special cases
+    if (!_empty)
     {
-        // Buffer is full
-        available = 0;
-        start = nullptr;
-        return;
+        if (_push_next == _pop_next)
+        {
+            // Buffer is full
+            available = 0;
+            start = nullptr;
+            return;
+        }
+        else if ((_pop_next < _ring_start) && (_push_next == _ring_start))
+        {
+            // TODO: buffer may be full. Cannot tell.
+            available = 0;
+            start = nullptr;
+            return;
+        }
     }
 
     if (_push_next < _pop_next)
@@ -100,6 +114,7 @@ void RingbufR<_T>::updateEnd(size_t increment)
     if (_push_next > _ring_end)
     {
         size_t excess = _push_next - _ring_end;
+        std::cout << "right guard " << excess << std::endl;
         // Move excess data to start
         _push_next = _ring_start + excess;
         _T* source = _ring_end;
@@ -156,8 +171,6 @@ void RingbufR<_T>::updateStart(size_t increment)
         // Wrap around is in effect
         limit = _ring_end;
         stub_data = _ring_end - new_next;
-        // Debug code
-        stub_data = 0;
     }
     else
     {
@@ -171,11 +184,14 @@ void RingbufR<_T>::updateStart(size_t increment)
 
     // Edge guard: move data from end of buffer.
     // TODO: check for previous move already in effect?
-    if (stub_data && (stub_data < _edge_guard))
+    if ((_pop_next >= _ring_start) && (_pop_next != _push_next) &&
+            stub_data && (stub_data <= _edge_guard))
     {
         _T* source = new_next;
         new_next = _ring_start - stub_data;
         _T* dest = new_next;
+        std::cout << "left guard " << stub_data <<
+            " destination " << dest - _ring_start << std::endl;
         while (stub_data-- > 0)
             *dest++ = *source++;
     }

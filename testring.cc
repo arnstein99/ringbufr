@@ -137,14 +137,13 @@ static void Reader ()
         rbuf.popInquire(available, start);
         if (available)
         {
-            ssize_t count = 1;
+            size_t count = 1;
             if (available > 1)
                 count = (rand() % (available-1)) + 1;
             if (verbose >= 1)
                 std::cout << "(will pop " << count <<
                 " starting at " << start - buffer << ")" << std::endl;
-            ssize_t i = count;
-            while (i-- > 0)
+            for (size_t i = 0 ; i < count ; ++i)
             {
                 ++serial;
                 auto observed = start->serialNumber;
