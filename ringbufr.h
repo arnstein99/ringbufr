@@ -44,16 +44,12 @@ protected:
     const size_t _capacity;
     const size_t _edge_guard;
     _T* const _edge_start;
-    _T* const _ring_start;
-    _T* const _ring_end;
     _T* const _edge_end;
     bool _empty;
     _T* _push_next;
     _T* _pop_next;
-
-private:
-
-    size_t compute_right() const;
+    _T* _ring_start;
+    _T* _ring_end;
 };
 
 // Implementation
