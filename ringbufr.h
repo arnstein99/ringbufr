@@ -35,6 +35,7 @@ public:
     void push(size_t newContent);
     void popInquire(size_t& available, _T*& start) const;
     void pop(size_t oldContent);
+    size_t size() const;
 
 protected:
 

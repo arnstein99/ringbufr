@@ -12,9 +12,9 @@
 // Tuning
 static const int read_usleep_range  = 1000000;
 static const int write_usleep_range = 1000000;
-static const int buffer_size = 37;
-static const int guard_size = 7;
-static const int verbose = 1;
+static const size_t buffer_size = 37;
+static const size_t guard_size = 7;
+static const size_t verbose = 1;
 // #define USE_POSIX
 #define DEFAULT_RUN_SECONDS 300
 
@@ -70,11 +70,11 @@ int main (int argc, char* argv[])
     // Cheat
     size_t available;
     rbuf.pushInquire(available, buffer);
-    
+
     std::thread hReader (Reader);
     std::thread hWriter (Writer);
     sleep (run_seconds);
-    
+
     running = false;
     hWriter.join();
     hReader.join();
@@ -97,9 +97,12 @@ static void Writer ()
             size_t count = 1;
             if (available > 1)
                 count = (rand() % (available-1)) + 1;
+            // Temporary, test of edge guard
+            if (available >= guard_size)
+                count = std::max(count, guard_size);
             if (verbose >= 1)
             {
-                std::cout << "(pushing " << count <<
+                std::cout << "(will push " << count <<
                     " at " << start - buffer <<
                     " starting with value " << serial + 1 << ")" << std::endl;
             }
@@ -118,6 +121,7 @@ static void Writer ()
                 std::cout << "Write failure" << std::endl;
                 exit(1);
             }
+            std::cout << "size is now " << rbuf.size() << std::endl;
         }
     }
 }
@@ -140,6 +144,9 @@ static void Reader ()
             size_t count = 1;
             if (available > 1)
                 count = (rand() % (available-1)) + 1;
+            // Temporary, test of edge guard
+            if (available >= guard_size)
+                count = std::max(count, guard_size);
             if (verbose >= 1)
                 std::cout << "(will pop " << count <<
                 " starting at " << start - buffer << ")" << std::endl;
@@ -165,6 +172,7 @@ static void Reader ()
                 std::cout << "Read failure " << std::endl;
                 exit(1);
             }
+            std::cout << "size is now " << rbuf.size() << std::endl;
         }
         else if (!running)
         {

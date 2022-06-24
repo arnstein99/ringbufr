@@ -37,7 +37,7 @@ void RingbufR<_T>::pushInquire(size_t& available, _T*& start) const
     {
         if (_push_next <= _pop_next)
         {
-            // Deal with wrap-around
+            // Wrap-around is in effect
             available = _pop_next - _push_next;
         }
         else
@@ -163,9 +163,11 @@ void RingbufR<_T>::updateStart(size_t increment)
         // Invalid data has already been copied out
         throw RingbufREmptyException();
     }
-    
-    // Update complete. Shift buffer to right if appropriate.
+
+    // Update complete.
     _pop_next = new_next;
+
+    // Shift buffer to right if appropriate.
     if (_push_next > _pop_next)
     {
         // Wrap-around is not in effect, can proceed.
@@ -175,8 +177,28 @@ void RingbufR<_T>::updateStart(size_t increment)
         _ring_start += right_shift;
         _ring_end   += right_shift;
     }
+    else
+    {
+        // Possibly, eliminate wrap-around condition.
+        size_t stub_data = _ring_end - _pop_next;
+        if (stub_data < _edge_guard)
+        {
+            // The stub data is too small. Try to shift it.
+            size_t buffer_available = _ring_start - _edge_start;
+            if (buffer_available >= stub_data)
+            {
+                _ring_start -= stub_data;
+                _ring_end   -= stub_data;
+                _T* source = _pop_next;
+                _T* dest   = _ring_start;
+                while (stub_data-- > 0) *dest++ = *source++;
+                _pop_next = _ring_start;
+            }
+        }
+    }
 
     if (_pop_next == _ring_end) _pop_next = _ring_start;
+
     _empty = (_pop_next == _push_next);
 }
 
@@ -184,4 +206,19 @@ template<typename _T>
 void RingbufR<_T>::pop(size_t oldContent)
 {
     updateStart(oldContent);
+}
+
+template<typename _T>
+size_t RingbufR<_T>::size() const
+{
+    if (_empty) return 0;
+    if (_push_next <= _pop_next)
+    {
+        // Wrap-around is in effect
+        return (_ring_end - _pop_next) + (_push_next - _ring_start);
+    }
+    else
+    {
+        return (_push_next - _pop_next);
+    }
 }
