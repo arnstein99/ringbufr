@@ -6,12 +6,16 @@
 #include <string>
 #include <thread>
 #include <stdio.h>
+#include <chrono>
+using namespace std::chrono_literals;
 #include "posix_ringbufr.h"
 
 // Tuning
-static const int read_usleep_range = 1000000;
-static const int write_usleep_range = 1000000;
-static const int verbose = 0;
+static const int read_usleep_range  = 500000;
+static const int write_usleep_range = 500000;
+static const size_t buffer_size = 37;
+static const size_t guard_size = 7;
+static const size_t verbose = 1;
 #define USE_POSIX
 #define DEFAULT_RUN_SECONDS 300
 
@@ -22,11 +26,12 @@ public:
     double doubleMember;
     char stringMember[32];
 };
+Dummy* buffer;
 
 #ifdef USE_POSIX
-static Posix_RingbufR<Dummy> rbuf (11, (verbose >= 1 ? true : false));
+static Posix_RingbufR<Dummy> rbuf(buffer_size, 0 /*verbose*/, guard_size);
 #else
-static RingbufR<Dummy> rbuf (11);
+static RingbufR<Dummy> rbuf (buffer_size, guard_size);
 #endif
 static bool running = true;
 
@@ -61,11 +66,15 @@ int main (int argc, char* argv[])
         Usage_exit (0);
         break;
     }
-    
+    // Cheat
+    size_t available;
+    rbuf.pushInquire(available, buffer);
+    buffer -= 2*guard_size;
+
     std::thread hReader (Reader);
     std::thread hWriter (Writer);
     sleep (run_seconds);
-    
+
     running = false;
     hWriter.join();
     hReader.join();
@@ -78,31 +87,43 @@ static void Writer ()
     while (running)
     {
         int write_usleep = (rand() % write_usleep_range) + 1;
-        usleep (write_usleep);
+        std::this_thread::sleep_for(write_usleep * 1us);
         size_t available;
         Dummy* start;
         rbuf.pushInquire(available, start);
+        write_usleep = (rand() % write_usleep_range) + 1;
+        std::this_thread::sleep_for(write_usleep * 1us);
         if (available)
         {
-            start->serialNumber = ++serial;
+            size_t count = 1;
+            if (available > 1)
+                count = (rand() % (available-1)) + 1;
+            // Temporary, test of edge guard
+            if (available >= guard_size)
+                count = std::max(count, guard_size);
             if (verbose >= 1)
             {
-                std::cout << "(will push " << serial << ")" << std::endl;
+                std::cout << "(will push " << count <<
+                    " at " << start - buffer <<
+                    " starting with value " << serial + 1 << ")" << std::endl;
+            }
+            size_t i = count;
+            while (i-- > 0)
+            {
+                start->serialNumber = ++serial;
+                ++start;
             }
             try
             {
-                rbuf.push(1);
+                rbuf.push(count);
             }
             catch (RingbufRFullException)
             {
-                std::cout << "Write failure " << serial << std::endl;
+                std::cout << "Write failure" << std::endl;
                 exit(1);
             }
-        }
-        else
-        {
-            if (verbose >= 1)
-                std::cout << "(missed opportunity push)" << std::endl;
+            std::cout << "size is now " << rbuf.size() <<
+                ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
         }
     }
 }
@@ -112,39 +133,54 @@ static void Reader ()
 {
     static __thread int serial = 0;
 
-    while (running)
+    while (true)
     {
         int read_usleep = (rand() % read_usleep_range) + 1;
-            usleep (read_usleep);
+        std::this_thread::sleep_for(read_usleep * 1us);
         size_t available;
         Dummy* start;
         rbuf.popInquire(available, start);
+        read_usleep = (rand() % read_usleep_range) + 1;
+        std::this_thread::sleep_for(read_usleep * 1us);
         if (available)
         {
-            ++serial;
-            auto observed = start->serialNumber;
+            size_t count = 1;
+            if (available > 1)
+                count = (rand() % (available-1)) + 1;
+            // Temporary, test of edge guard
+            if (available >= guard_size)
+                count = std::max(count, guard_size);
             if (verbose >= 1)
-            std::cout << "(will pop " << observed << ")" << std::endl;
-            if (observed != serial)
+                std::cout << "(will pop " << count <<
+                " starting at " << start - buffer << ")" << std::endl;
+            for (size_t i = 0 ; i < count ; ++i)
             {
-                std::cout << "*** ERROR *** ";
-                std::cout << "Pop: expected " << serial << " got " <<
-                    observed << std::endl;
+                ++serial;
+                auto observed = start->serialNumber;
+                if (observed != serial)
+                {
+                    std::cout << "*** ERROR *** ";
+                    std::cout << "Pop: expected " << serial << " got " <<
+                        observed << " offset " << i << std::endl;
+                    exit(1);
+                }
+                ++start;
             }
             try
             {
-                rbuf.pop(1);
+                rbuf.pop(count);
             }
             catch (RingbufREmptyException)
             {
-                std::cout << "Read failure " << serial << std::endl;
+                std::cout << "Read failure " << std::endl;
                 exit(1);
             }
+            std::cout << "size is now " << rbuf.size() <<
+                ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
         }
-        else
+        else if (!running)
         {
-            if (verbose >= 1)
-                std::cout << "(missed opportunity pop)" << std::endl;
+            break;
         }
     }
 }

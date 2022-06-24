@@ -19,7 +19,7 @@ tcppush: tcppush.o copyfd.o miscutils.o netutils.o
 tcpcat: tcpcat.o copyfd.o miscutils.o netutils.o
 tcprelay: tcprelay.o copyfd.o miscutils.o netutils.o
 
-copyfd.o: ringbufr.h
+copyfd.o: ringbufr.h ringbufr.tcc
 ringcat.o: copyfd.h
 testring.o: posix_ringbufr.h ringbufr.h ringbufr.tcc
 tcpget.o: copyfd.h miscutils.h netutils.h
@@ -28,5 +28,5 @@ tcppull.o: copyfd.h miscutils.h netutils.h
 tcppush.o: copyfd.h miscutils.h netutils.h
 tcpcat.o: copyfd.h miscutils.h netutils.h
 tcprelay.o: copyfd.h miscutils.h netutils.h
-netutils.o: netutils.h miscutils.h
+netutils.o: netutils.h miscutils.h ringbufr.h
 miscutils.o: miscutils.h

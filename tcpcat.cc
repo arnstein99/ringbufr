@@ -92,10 +92,10 @@ int main (int argc, char* argv[])
 #ifdef VERBOSE
     std::cerr << "starting copy, socket " << input_socket <<
         " to socket " << output_socket << std::endl;
-    auto bytes_processed = copyfd(input_socket, output_socket, 131072);
+    auto bytes_processed = copyfd(input_socket, output_socket, 126*1024, 2*1024);
     std::cerr << bytes_processed << " copied" << std::endl;
 #else
-    copyfd(input_socket, output_socket, 131072);
+    copyfd(input_socket, output_socket, 126*1024, 2*1024);
 #endif
 
     close(output_socket);
