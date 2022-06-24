@@ -167,7 +167,7 @@ void RingbufR<_T>::updateStart(size_t increment)
     // Update complete.
     _pop_next = new_next;
 
-    // Shift buffer to right if appropriate.
+    // Shift buffer to minimize edge effects. Two cases to consider.
     if (_push_next <= _pop_next)
     {
         // Wrap-around is in effect. Maybe eliminate it.
