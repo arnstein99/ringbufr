@@ -6,19 +6,18 @@
 #include <string>
 #include <thread>
 #include <stdio.h>
-#include <mutex>
+#include <chrono>
+using namespace std::chrono_literals;
 #include "posix_ringbufr.h"
 
 // Tuning
-static const int read_usleep_range  = 1000000;
-static const int write_usleep_range = 1000000;
+static const int read_usleep_range  = 500000;
+static const int write_usleep_range = 500000;
 static const size_t buffer_size = 37;
 static const size_t guard_size = 7;
 static const size_t verbose = 1;
-// #define USE_POSIX
+#define USE_POSIX
 #define DEFAULT_RUN_SECONDS 300
-
-std::mutex _mutex;
 
 class Dummy
 {
@@ -30,7 +29,7 @@ public:
 Dummy* buffer;
 
 #ifdef USE_POSIX
-static Posix_RingbufR<Dummy> rbuf(buffer_size, verbose, guard_size);
+static Posix_RingbufR<Dummy> rbuf(buffer_size, 0 /*verbose*/, guard_size);
 #else
 static RingbufR<Dummy> rbuf (buffer_size, guard_size);
 #endif
@@ -88,11 +87,12 @@ static void Writer ()
     while (running)
     {
         int write_usleep = (rand() % write_usleep_range) + 1;
-        usleep (write_usleep);
+        std::this_thread::sleep_for(write_usleep * 1us);
         size_t available;
         Dummy* start;
-        auto lock = std::lock_guard(_mutex);
         rbuf.pushInquire(available, start);
+        write_usleep = (rand() % write_usleep_range) + 1;
+        std::this_thread::sleep_for(write_usleep * 1us);
         if (available)
         {
             size_t count = 1;
@@ -136,11 +136,12 @@ static void Reader ()
     while (true)
     {
         int read_usleep = (rand() % read_usleep_range) + 1;
-        usleep (read_usleep);
+        std::this_thread::sleep_for(read_usleep * 1us);
         size_t available;
         Dummy* start;
-        auto lock = std::lock_guard(_mutex);
         rbuf.popInquire(available, start);
+        read_usleep = (rand() % read_usleep_range) + 1;
+        std::this_thread::sleep_for(read_usleep * 1us);
         if (available)
         {
             size_t count = 1;
