@@ -19,13 +19,13 @@ using namespace std::chrono;
         /* std::cerr << "checkpoint " << __LINE__ << std::endl; */ \
     } while (false)
 
-size_t copyfd(int readfd, int writefd, size_t chunk_size)
+size_t copyfd(int readfd, int writefd, size_t chunk_size, size_t pad)
 {
     int maxfd = std::max(readfd, writefd) + 1;
     fd_set read_set;
     fd_set write_set;
 
-    RingbufR<unsigned char> bufr(3 * chunk_size);
+    RingbufR<unsigned char> bufr(3 * chunk_size, pad);
 
     ssize_t bytes_read = 0;
     ssize_t bytes_write = 0;
