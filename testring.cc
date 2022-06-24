@@ -70,6 +70,7 @@ int main (int argc, char* argv[])
     // Cheat
     size_t available;
     rbuf.pushInquire(available, buffer);
+    buffer -= guard_size;
 
     std::thread hReader (Reader);
     std::thread hWriter (Writer);
@@ -121,7 +122,8 @@ static void Writer ()
                 std::cout << "Write failure" << std::endl;
                 exit(1);
             }
-            std::cout << "size is now " << rbuf.size() << std::endl;
+            std::cout << "size is now " << rbuf.size() <<
+                ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
         }
     }
 }
@@ -172,7 +174,8 @@ static void Reader ()
                 std::cout << "Read failure " << std::endl;
                 exit(1);
             }
-            std::cout << "size is now " << rbuf.size() << std::endl;
+            std::cout << "size is now " << rbuf.size() <<
+                ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
         }
         else if (!running)
         {

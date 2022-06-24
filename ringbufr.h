@@ -37,6 +37,9 @@ public:
     void pop(size_t oldContent);
     size_t size() const;
 
+    // For debugging
+    const _T* ring_start() const;
+
 protected:
 
     virtual void updateStart(size_t increment);

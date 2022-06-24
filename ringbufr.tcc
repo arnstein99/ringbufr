@@ -87,7 +87,7 @@ void RingbufR<_T>::updateEnd(size_t increment)
     {
         // Wrap-around is not in effect, can proceed.
         size_t unused_ring = _ring_end - _push_next;
-        if (unused_ring <= _edge_guard)
+        if (unused_ring < _edge_guard)
         {
             // Unused space at right of ring buffer is too small. May lead to
             // fragmentation.
@@ -168,18 +168,9 @@ void RingbufR<_T>::updateStart(size_t increment)
     _pop_next = new_next;
 
     // Shift buffer to right if appropriate.
-    if (_push_next > _pop_next)
+    if (_push_next <= _pop_next)
     {
-        // Wrap-around is not in effect, can proceed.
-        size_t unused_ring = _pop_next - _ring_start;
-        size_t unused_buffer = _edge_end - _ring_end;
-        size_t right_shift = std::min(unused_ring, unused_buffer);
-        _ring_start += right_shift;
-        _ring_end   += right_shift;
-    }
-    else
-    {
-        // Possibly, eliminate wrap-around condition.
+        // Wrap-around is in effect. Maybe eliminate it.
         size_t stub_data = _ring_end - _pop_next;
         if (stub_data < _edge_guard)
         {
@@ -194,6 +185,24 @@ void RingbufR<_T>::updateStart(size_t increment)
                 while (stub_data-- > 0) *dest++ = *source++;
                 _pop_next = _ring_start;
             }
+        }
+    }
+    else
+    {
+        // Wrap-around is not in effect, try to shift buffer to the right.
+        size_t unused_ring = _pop_next - _ring_start;
+        size_t unused_buffer = _edge_end - _ring_end;
+        size_t right_shift = std::min(unused_ring, unused_buffer);
+        // Stop at _edge_guard (centered)
+        if ((_ring_start + right_shift) > (_edge_start + _edge_guard))
+        {
+            _ring_start = _edge_start + _edge_guard;
+            _ring_end   = _ring_start + _capacity;
+        }
+        else
+        {
+            _ring_start += right_shift;
+            _ring_end   += right_shift;
         }
     }
 
@@ -221,4 +230,10 @@ size_t RingbufR<_T>::size() const
     {
         return (_push_next - _pop_next);
     }
+}
+
+template<typename _T>
+const _T* RingbufR<_T>::ring_start() const
+{
+    return _ring_start;
 }
