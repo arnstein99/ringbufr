@@ -12,7 +12,7 @@ RingbufR<_T>::RingbufR (size_t capacity, size_t edge_guard)
       _edge_start(new _T[capacity + 2*edge_guard]),
       _edge_end(_edge_start + capacity + 2*edge_guard)
 {
-    _ring_start = _edge_start + edge_guard;
+    _ring_start = _edge_start + 2*edge_guard;
     _ring_end   = _ring_start + capacity;
     _push_next  = _ring_start;
     _pop_next   = _ring_start;

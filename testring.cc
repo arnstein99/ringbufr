@@ -69,7 +69,7 @@ int main (int argc, char* argv[])
     // Cheat
     size_t available;
     rbuf.pushInquire(available, buffer);
-    buffer -= guard_size;
+    buffer -= 2*guard_size;
 
     std::thread hReader (Reader);
     std::thread hWriter (Writer);
