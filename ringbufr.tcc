@@ -193,17 +193,8 @@ void RingbufR<_T>::updateStart(size_t increment)
         size_t unused_ring = _pop_next - _ring_start;
         size_t unused_buffer = _edge_end - _ring_end;
         size_t right_shift = std::min(unused_ring, unused_buffer);
-        // Stop at _edge_guard (centered)
-        if ((_ring_start + right_shift) > (_edge_start + _edge_guard))
-        {
-            _ring_start = _edge_start + _edge_guard;
-            _ring_end   = _ring_start + _capacity;
-        }
-        else
-        {
-            _ring_start += right_shift;
-            _ring_end   += right_shift;
-        }
+        _ring_start += right_shift;
+        _ring_end   += right_shift;
     }
 
     if (_pop_next == _ring_end) _pop_next = _ring_start;
