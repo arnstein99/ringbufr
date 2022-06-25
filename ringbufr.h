@@ -26,10 +26,13 @@ class RingbufR
 {
 public:
 
-    RingbufR (size_t capacity, size_t edge_guard = 0);
+    RingbufR (size_t capacity, size_t push_pad=0, size_t pop_pad=0);
     virtual ~RingbufR ();
-    RingbufR() = delete; // No default constructor
-    RingbufR(const RingbufR<_T>&) = delete; // No copy constructor
+    RingbufR(const RingbufR&) = delete;
+    RingbufR() = delete;
+    RingbufR(RingbufR&&) = delete;
+    RingbufR& operator=(const RingbufR&) = delete;
+    RingbufR& operator=(RingbufR&&) = delete;
 
     void pushInquire(size_t& available, _T*& start) const;
     void push(size_t newContent);
@@ -46,7 +49,8 @@ protected:
     virtual void updateEnd(size_t increment);
 
     const size_t _capacity;
-    const size_t _edge_guard;
+    const size_t _push_pad;
+    const size_t _pop_pad;
     _T* const _edge_start;
     _T* const _edge_end;
     bool _empty;
@@ -55,8 +59,5 @@ protected:
     _T* _ring_start;
     _T* _ring_end;
 };
-
-// Implementation
-#include "ringbufr.tcc"
 
 #endif // __RINGBUFR_H_
