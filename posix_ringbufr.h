@@ -14,8 +14,11 @@ class Posix_RingbufR : public RingbufR<_T>
 {
 public:
 
-    Posix_RingbufR (size_t capacity, int verbose, ssize_t edge_guard = 0)
-        : RingbufR<_T> (capacity, edge_guard), _verbose(verbose)
+    Posix_RingbufR (
+            size_t capacity, int verbose,
+            size_t push_pad=0, size_t pop_pad=0)
+        : RingbufR<_T> (capacity, push_pad, pop_pad),
+          _verbose(verbose)
     {
     }
 

@@ -1,4 +1,6 @@
 // Implementation of RingbufR
+#ifndef __RINGBUFR_TCC
+#define __RINGBUFR_TCC
 
 #include <cassert>
 #include <algorithm>
@@ -6,14 +8,19 @@
 #include <iostream>
 
 template<typename _T>
-RingbufR<_T>::RingbufR (size_t capacity, size_t edge_guard)
-    : _capacity(capacity),
-      _edge_guard(edge_guard),
-      _edge_start(new _T[capacity + 2*edge_guard]),
-      _edge_end(_edge_start + capacity + 2*edge_guard)
+RingbufR<_T>::RingbufR (size_t capacity, size_t push_pad, size_t pop_pad)
+    : _capacity(capacity - push_pad - pop_pad),
+      _push_pad(push_pad),
+      _pop_pad(pop_pad),
+      _edge_start(new _T[capacity]),
+      _edge_end(_edge_start + capacity)
 {
-    _ring_start = _edge_start + 2*edge_guard;
-    _ring_end   = _ring_start + capacity;
+    if (capacity <= (push_pad + pop_pad))
+    {
+        throw (RingbufRArgumentException());
+    }
+    _ring_start = _edge_start + push_pad + pop_pad;
+    _ring_end   = _ring_start + _capacity;
     _push_next  = _ring_start;
     _pop_next   = _ring_start;
     _empty = true;
@@ -87,7 +94,7 @@ void RingbufR<_T>::updateEnd(size_t increment)
     {
         // Wrap-around is not in effect, can proceed.
         size_t unused_ring = _ring_end - _push_next;
-        if (unused_ring < _edge_guard)
+        if (unused_ring < _push_pad)
         {
             // Unused space at right of ring buffer is too small. May lead to
             // fragmentation.
@@ -172,7 +179,7 @@ void RingbufR<_T>::updateStart(size_t increment)
     {
         // Wrap-around is in effect. Maybe eliminate it.
         size_t stub_data = _ring_end - _pop_next;
-        if (stub_data < _edge_guard)
+        if (stub_data < _pop_pad)
         {
             // The stub data is too small. Try to shift it.
             size_t buffer_available = _ring_start - _edge_start;
@@ -228,3 +235,11 @@ const _T* RingbufR<_T>::ring_start() const
 {
     return _ring_start;
 }
+
+template<typename _T>
+const _T* RingbufR<_T>::buffer_start() const
+{
+    return _edge_start;
+}
+
+#endif // __RINGBUFR_TCC

@@ -13,8 +13,9 @@ using namespace std::chrono_literals;
 // Tuning
 static const int read_usleep_range  = 500000;
 static const int write_usleep_range = 500000;
-static const size_t buffer_size = 37;
-static const size_t guard_size = 7;
+static const size_t buffer_size = 37 + 7 + 6;
+static const size_t push_pad = 7;
+static const size_t pop_pad = 6;
 static const size_t verbose = 1;
 #define USE_POSIX
 #define DEFAULT_RUN_SECONDS 300
@@ -26,12 +27,19 @@ public:
     double doubleMember;
     char stringMember[32];
 };
-Dummy* buffer;
+const Dummy* buffer;
+
+int my_rand(int lower, int upper)
+{
+    if (lower == upper) return lower;
+    return lower + rand() % (upper - lower);
+}
 
 #ifdef USE_POSIX
-static Posix_RingbufR<Dummy> rbuf(buffer_size, 0 /*verbose*/, guard_size);
+static Posix_RingbufR<Dummy> rbuf(
+    buffer_size, 0 /*verbose*/, push_pad, pop_pad);
 #else
-static RingbufR<Dummy> rbuf (buffer_size, guard_size);
+static RingbufR<Dummy> rbuf (buffer_size, push_pad, pop_pad);
 #endif
 static bool running = true;
 
@@ -67,9 +75,7 @@ int main (int argc, char* argv[])
         break;
     }
     // Cheat
-    size_t available;
-    rbuf.pushInquire(available, buffer);
-    buffer -= 2*guard_size;
+    buffer = rbuf.buffer_start();
 
     std::thread hReader (Reader);
     std::thread hWriter (Writer);
@@ -86,21 +92,16 @@ static void Writer ()
 
     while (running)
     {
-        int write_usleep = (rand() % write_usleep_range) + 1;
+        int write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
         size_t available;
         Dummy* start;
         rbuf.pushInquire(available, start);
-        write_usleep = (rand() % write_usleep_range) + 1;
+        write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
         if (available)
         {
-            size_t count = 1;
-            if (available > 1)
-                count = (rand() % (available-1)) + 1;
-            // Temporary, test of edge guard
-            if (available >= guard_size)
-                count = std::max(count, guard_size);
+            size_t count = my_rand(1, available);
             if (verbose >= 1)
             {
                 std::cout << "(will push " << count <<
@@ -135,21 +136,16 @@ static void Reader ()
 
     while (true)
     {
-        int read_usleep = (rand() % read_usleep_range) + 1;
+        size_t read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);
         size_t available;
         Dummy* start;
         rbuf.popInquire(available, start);
-        read_usleep = (rand() % read_usleep_range) + 1;
+        read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);
         if (available)
         {
-            size_t count = 1;
-            if (available > 1)
-                count = (rand() % (available-1)) + 1;
-            // Temporary, test of edge guard
-            if (available >= guard_size)
-                count = std::max(count, guard_size);
+            int count = my_rand(1, available);
             if (verbose >= 1)
                 std::cout << "(will pop " << count <<
                 " starting at " << start - buffer << ")" << std::endl;
@@ -190,3 +186,5 @@ static void Usage_exit (int exit_val)
     std::cerr << "Usage: test_ring [run_seconds]" << std::endl;
     exit (exit_val);
 }
+
+#include "ringbufr.tcc"

@@ -19,13 +19,16 @@ using namespace std::chrono;
         /* std::cerr << "checkpoint " << __LINE__ << std::endl; */ \
     } while (false)
 
-size_t copyfd(int readfd, int writefd, size_t chunk_size, size_t pad)
+size_t
+copyfd(
+    int readfd, int writefd,
+    size_t buffer_size, size_t push_pad, size_t pop_pad)
 {
     int maxfd = std::max(readfd, writefd) + 1;
     fd_set read_set;
     fd_set write_set;
 
-    RingbufR<unsigned char> bufr(3 * chunk_size, pad);
+    RingbufR<unsigned char> bufr(buffer_size, push_pad, pop_pad);
 
     ssize_t bytes_read = 0;
     ssize_t bytes_write = 0;
@@ -45,7 +48,7 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size, size_t pad)
         {
             CHECKPOINT;
 #ifdef VERBOSE
-            read_available = std::min(read_available, chunk_size);
+            read_available = std::min(read_available, buffer_size);
             auto before = system_clock::now();
 #endif // VERBOSE
             bytes_read = read(readfd, read_start, read_available);
@@ -169,3 +172,5 @@ size_t copyfd(int readfd, int writefd, size_t chunk_size, size_t pad)
 
     return bytes_processed;
 }
+
+#include "ringbufr.tcc"
