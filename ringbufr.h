@@ -53,6 +53,8 @@ protected:
     virtual void updateStart(size_t increment);
     virtual void updateEnd(size_t increment);
 
+private:
+
     const size_t _capacity;
     const size_t _push_pad;
     const size_t _pop_pad;

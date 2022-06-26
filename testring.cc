@@ -91,7 +91,7 @@ int my_rand(int lower, int upper)
 
 #ifdef USE_POSIX
 static Posix_RingbufR<TestClass> rbuf(
-    buffer_size, 0 /*verbose*/, push_pad, pop_pad);
+    buffer_size, push_pad, pop_pad);
 #else
 static RingbufR<TestClass> rbuf (buffer_size, push_pad, pop_pad);
 #endif
