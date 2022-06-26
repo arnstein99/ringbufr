@@ -11,6 +11,10 @@
 class RingbufRException
 {
 };
+class RingbufRArgumentException
+    : public RingbufRException
+{
+};
 class RingbufREmptyException
     : public RingbufRException
 {
@@ -41,6 +45,7 @@ public:
     size_t size() const;
 
     // For debugging
+    const _T* buffer_start() const;
     const _T* ring_start() const;
 
 protected:

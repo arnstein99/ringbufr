@@ -9,14 +9,18 @@
 
 template<typename _T>
 RingbufR<_T>::RingbufR (size_t capacity, size_t push_pad, size_t pop_pad)
-    : _capacity(capacity),
+    : _capacity(capacity - push_pad - pop_pad),
       _push_pad(push_pad),
       _pop_pad(pop_pad),
-      _edge_start(new _T[capacity + push_pad + pop_pad]),
-      _edge_end(_edge_start + capacity + push_pad + pop_pad)
+      _edge_start(new _T[capacity]),
+      _edge_end(_edge_start + capacity)
 {
+    if (capacity <= (push_pad + pop_pad))
+    {
+        throw (RingbufRArgumentException());
+    }
     _ring_start = _edge_start + push_pad + pop_pad;
-    _ring_end   = _ring_start + capacity;
+    _ring_end   = _ring_start + _capacity;
     _push_next  = _ring_start;
     _pop_next   = _ring_start;
     _empty = true;
@@ -230,6 +234,12 @@ template<typename _T>
 const _T* RingbufR<_T>::ring_start() const
 {
     return _ring_start;
+}
+
+template<typename _T>
+const _T* RingbufR<_T>::buffer_start() const
+{
+    return _edge_start;
 }
 
 #endif // __RINGBUFR_TCC
