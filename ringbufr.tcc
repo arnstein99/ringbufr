@@ -189,7 +189,13 @@ void RingbufR<_T>::updateStart(size_t increment)
                 _ring_end   -= stub_data;
                 _T* source = _pop_next;
                 _T* dest   = _ring_start;
-                while (stub_data-- > 0) *dest++ = *source++;
+                while (stub_data-- > 0)
+                {
+                    // *dest++ = std::move(source++);
+                    auto& des = *dest++;
+                    auto& sour = *source++;
+                    des = std::move(sour);
+                }
                 _pop_next = _ring_start;
             }
         }
