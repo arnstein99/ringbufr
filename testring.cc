@@ -198,7 +198,7 @@ static void Reader ()
         std::this_thread::sleep_for(read_usleep * 1us);
         if (available)
         {
-            int count = my_rand(1, available);
+            size_t count = my_rand(1, available);
             if (verbose >= 1)
                 std::cout << "(will pop " << count <<
                 " starting at " << start - buffer << ")" << std::endl;
