@@ -20,14 +20,68 @@ static const size_t verbose = 1;
 #define USE_POSIX
 #define DEFAULT_RUN_SECONDS 300
 
-class Dummy
+void itoa(int num, char* str)
+{
+    sprintf(str, "%d", num);
+}
+class TestClass
 {
 public:
+    TestClass(int serial=0)
+     : serialNumber(serial)
+    {
+        name = new char[9];
+        itoa(serial, name);
+    }
+    ~TestClass()
+    {
+        delete[] name;
+    }
+    TestClass(const TestClass&) = delete;
+    TestClass& operator=(const TestClass&) = delete;
+    TestClass& operator=(TestClass&& other)
+    {
+        serialNumber = other.serialNumber;
+        auto tmp = name;
+        name = other.name;
+        other.name = tmp;
+        return *this;
+    }
+    bool operator==(const TestClass& other)
+    {
+        return
+            (serialNumber == other.serialNumber) &&
+            (strcmp(name, other.name) == 0);
+    }
+    TestClass& operator=(int ser)
+    {
+        serialNumber = ser;
+        itoa(ser, name);
+        return *this;
+    }
+    bool operator!=(const TestClass& other)
+    {
+        return !operator==(other);
+    }
+    std::ostream& print(std::ostream& ost) const
+    {
+        ost << serialNumber << " (\"" << name << ")\"";
+        return ost;
+    }
+    int serial() const
+    {
+        return serialNumber;
+    }
+private:
     int serialNumber;
-    double doubleMember;
-    char stringMember[32];
+    char* name;
 };
-const Dummy* buffer;
+std::ostream& operator<<(std::ostream& ost, const TestClass& tc)
+{
+    return tc.print(ost);
+}
+
+const TestClass* buffer;
 
 int my_rand(int lower, int upper)
 {
@@ -36,10 +90,10 @@ int my_rand(int lower, int upper)
 }
 
 #ifdef USE_POSIX
-static Posix_RingbufR<Dummy> rbuf(
+static Posix_RingbufR<TestClass> rbuf(
     buffer_size, 0 /*verbose*/, push_pad, pop_pad);
 #else
-static RingbufR<Dummy> rbuf (buffer_size, push_pad, pop_pad);
+static RingbufR<TestClass> rbuf (buffer_size, push_pad, pop_pad);
 #endif
 static bool running = true;
 
@@ -95,7 +149,7 @@ static void Writer ()
         int write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
         size_t available;
-        Dummy* start;
+        TestClass* start;
         rbuf.pushInquire(available, start);
         write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
@@ -111,8 +165,7 @@ static void Writer ()
             size_t i = count;
             while (i-- > 0)
             {
-                start->serialNumber = ++serial;
-                ++start;
+                *start++ = ++serial;
             }
             try
             {
@@ -139,7 +192,7 @@ static void Reader ()
         size_t read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);
         size_t available;
-        Dummy* start;
+        TestClass* start;
         rbuf.popInquire(available, start);
         read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);
@@ -152,12 +205,11 @@ static void Reader ()
             for (size_t i = 0 ; i < count ; ++i)
             {
                 ++serial;
-                auto observed = start->serialNumber;
-                if (observed != serial)
+                if (start->serial() != serial)
                 {
                     std::cout << "*** ERROR *** ";
                     std::cout << "Pop: expected " << serial << " got " <<
-                        observed << " offset " << i << std::endl;
+                        start << " offset " << i << std::endl;
                     exit(1);
                 }
                 ++start;
