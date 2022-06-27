@@ -51,6 +51,7 @@ int listening_socket(int port_number)
     int socketFD;
     NEGCHECK("socket",
         (socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
+    no_linger(socketFD);
     struct sockaddr_in sa;
     memset (&sa, 0, sizeof (sa));
     sa.sin_family = AF_INET;
@@ -81,9 +82,11 @@ void double_listen(
     int socketFD_in;
     NEGCHECK("socket",
         (socketFD_in = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
+    no_linger(socketFD_in);
     int socketFD_out;
     NEGCHECK("socket",
         (socketFD_out = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
+    no_linger(socketFD_out);
 
     // Bind both sockets
     struct sockaddr_in sa;
@@ -141,8 +144,8 @@ void double_listen(
                 std::cerr << "accepted on input socket " << socketFD_in <<
                 std::endl;
             }
-            close(socketFD_in);
 #endif
+            close(socketFD_in);
         }
 
         if (connectFD_out < 0)
@@ -169,8 +172,8 @@ void double_listen(
                 std::cerr << "accepted on output socket " << socketFD_out <<
                 std::endl;
             }
-            close(socketFD_out);
 #endif
+            close(socketFD_out);
         }
 
         if (p_read_set)
@@ -187,4 +190,13 @@ void double_listen(
 #endif
     input_socket  = connectFD_in;
     output_socket = connectFD_out;
+}
+
+void no_linger(int socket)
+{
+    struct linger nope;
+    nope.l_onoff = 1;
+    nope.l_linger = 0;
+    NEGCHECK("setsockopt",
+        setsockopt(socket, SOL_SOCKET, SO_LINGER, &nope, sizeof(nope)));
 }

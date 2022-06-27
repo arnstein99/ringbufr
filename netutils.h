@@ -17,4 +17,7 @@ int listening_socket(int port_number);
 void double_listen(
     int input_port, int output_port, int& input_socket, int& output_socket);
 
+// Disables SO_LINGER on a socket
+void no_linger(int socket);
+
 #endif // __NETUTILS_H_
