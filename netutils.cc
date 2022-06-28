@@ -145,7 +145,6 @@ void double_listen(
                 std::endl;
             }
 #endif
-            close(socketFD_in);
         }
 
         if (connectFD_out < 0)
@@ -173,7 +172,6 @@ void double_listen(
                 std::endl;
             }
 #endif
-            close(socketFD_out);
         }
 
         if (p_read_set)
@@ -190,6 +188,8 @@ void double_listen(
 #endif
     input_socket  = connectFD_in;
     output_socket = connectFD_out;
+    close(socketFD_in);
+    close(socketFD_out);
 }
 
 void no_linger(int socket)
