@@ -69,7 +69,8 @@ copyfd(
                 else
                 {
                     // Some other error on input
-                    errorexit("read");
+                    ReadException r(bytes_processed);
+                    throw(r);
                 }
             }
             else if (bytes_read == 0)
@@ -114,15 +115,16 @@ copyfd(
                 {
                     CHECKPOINT;
                     // Some other error on write
-                    errorexit("write");
+                    WriteException w(bytes_processed);
+                    throw(w);
                 }
             }
             else if (bytes_write == 0)
             {
                 CHECKPOINT;
-                // Cannot accept EOF on write.
-                std::cerr << "copyfd: EOF on write descriptor" << std::endl;
-                exit(1);
+                // EOF on write.
+                WriteException w(bytes_processed);
+                throw(w);
             }
             else
             {

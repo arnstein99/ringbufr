@@ -17,6 +17,7 @@ struct Uri
 };
 static Uri process_args(int& argc, char**& argv);
 
+static size_t copy(int sock1, int sock2);
 static void usage_error();
 
 int main (int argc, char* argv[])
@@ -25,97 +26,91 @@ int main (int argc, char* argv[])
     int argc_copy = argc - 1;
     char** argv_copy = argv;
     ++argv_copy;
-    auto input_uri  = process_args(argc_copy, argv_copy);
-    auto output_uri = process_args(argc_copy, argv_copy);
+    auto first_uri  = process_args(argc_copy, argv_copy);
+    auto second_uri = process_args(argc_copy, argv_copy);
     if (argc_copy != 0) usage_error();
+    bool repeat = first_uri.listening || second_uri.listening;
 
-    // Special processing for double listen
-    int input_socket=0, output_socket=0;
-    if (input_uri.listening && output_uri.listening)
+    int first_socket=0, second_socket=0;
+    do
     {
-        // wait for both URIs to accept
-        double_listen(
-            input_uri.port, output_uri.port, input_socket, output_socket);
-    }
-    else if (input_uri.listening)
-    {
-        input_socket = listening_socket(input_uri.port);
-        if (output_uri.port == -1)
+        // Special processing for double listen
+        if (first_uri.listening && second_uri.listening)
         {
-            output_socket = 1;
+            // wait for both URIs to accept
+            double_listen(
+                first_uri.port, second_uri.port, first_socket, second_socket);
         }
-        else
+        else if (first_uri.listening)
         {
-            output_socket =
-                socket_from_address(output_uri.hostname, output_uri.port);
+            first_socket = listening_socket(first_uri.port);
+            if (second_uri.port == -1)
+            {
+                second_socket = 1;
+            }
+            else
+            {
+                second_socket =
+                    socket_from_address(second_uri.hostname, second_uri.port);
+            }
         }
-    }
-    else if (output_uri.listening)
-    {
-        output_socket = listening_socket(output_uri.port);
-        if (input_uri.port == -1)
+        else if (second_uri.listening)
         {
-            input_socket = 0;
+            second_socket = listening_socket(second_uri.port);
+            if (first_uri.port == -1)
+            {
+                first_socket = 0;
+            }
+            else
+            {
+                first_socket =
+                    socket_from_address(first_uri.hostname, first_uri.port);
+            }
         }
-        else
+        else // no listening
         {
-            input_socket =
-                socket_from_address(input_uri.hostname, input_uri.port);
+            if (first_uri.port == -1)
+            {
+                first_socket = 0;
+            }
+            else
+            {
+                first_socket =
+                    socket_from_address(first_uri.hostname, first_uri.port);
+            }
+            if (second_uri.port == -1)
+            {
+                second_socket = 1;
+            }
+            else
+            {
+                second_socket =
+                    socket_from_address(second_uri.hostname, second_uri.port);
+            }
         }
-    }
-    else // no listening
-    {
-        if (input_uri.port == -1)
-        {
-            input_socket = 0;
-        }
-        else
-        {
-            input_socket =
-                socket_from_address(input_uri.hostname, input_uri.port);
-        }
-        if (output_uri.port == -1)
-        {
-            output_socket = 1;
-        }
-        else
-        {
-            output_socket =
-                socket_from_address(output_uri.hostname, output_uri.port);
-        }
-    }
 
-    auto copy = [] (int sock1, int sock2)
-    {
-    // Copy!
-#ifdef VERBOSE
-    std::cerr << "starting copy, socket " << sock1 <<
-        " to socket " << sock2 << std::endl;
-    auto bytes_processed =
-        copyfd(sock1, sock2, 128*1024, 1024, 1024);
-    std::cerr << bytes_processed << " copied" << std::endl;
-#else
-    copyfd(sock1, sock2, 128*1024, 1024, 1024);
-#endif
-    };
-    std::thread one([&copy, input_socket, output_socket]()
-    {
-        copy(input_socket, output_socket);
-    });
-    std::thread two([&copy, input_socket, output_socket]()
-    {
-        copy(output_socket, input_socket);
-    });
-    one.join();
-    two.join();
+        // Cheap trick: use only one thread, so only have to wait on one
+        // thread.
+        std::thread one([first_socket, second_socket]()
+        {
+            copy(first_socket, second_socket);
+        });
+        copy(second_socket, first_socket);
+        close(second_socket);
+        close(first_socket);
+        one.join();
+        std::cerr << "joined one" << std::endl;
 
-    close(output_socket);
-    close(input_socket);
+    } while (repeat);
+
+    close(second_socket);
+    close(first_socket);
     return 0;
 }
 
 static Uri process_args(int& argc, char**& argv)
 // Group can be one of
+//     -pipe
 //     -listen <port
 //     -connect <hostname> <port>
 {
@@ -126,7 +121,12 @@ static Uri process_args(int& argc, char**& argv)
     ++argv;
     --argc;
 
-    if (strcmp(option, "-listen") == 0)
+    if (strcmp(option, "-pipe") == 0)
+    {
+        uri.listening = false;
+        uri.port = -1;
+    }
+    else if (strcmp(option, "-listen") == 0)
     {
         uri.listening = true;
         if (argc < 1) usage_error();
@@ -157,10 +157,40 @@ static Uri process_args(int& argc, char**& argv)
 
 void usage_error()
 {
-    std::cerr << "Usage: tcppipe <input_spec> <output_spec>" << std::endl;
-    std::cerr << "Each of <input_spec> and <output_spec> can be one of" <<
+    std::cerr << "Usage: tcppipe <first_spec> <second_spec>" << std::endl;
+    std::cerr << "Each of <first_spec> and <second_spec> can be one of" <<
         std::endl;
+    std::cerr << "    -pipe" << std::endl;
     std::cerr << "    -listen <port_number>" << std::endl;
     std::cerr << "    -connect <hostname> <port_number>" << std::endl;
     exit (1);
+}
+
+size_t copy(int sock1, int sock2)
+{
+    size_t bytes_processed;
+    try
+    {
+#ifdef VERBOSE
+        std::cerr << "starting copy, socket " << sock1 <<
+            " to socket " << sock2 << std::endl;
+        bytes_processed = copyfd(sock1, sock2, 128*1024, 2*1024, 2*1024);
+        std::cerr << bytes_processed << " copied" << std::endl;
+#else
+        bytes_processed = copyfd(sock1, sock2, 128*1024, 2*1024, 2*1024);
+#endif
+    }
+    catch (const ReadException& r)
+    {
+        bytes_processed = r.byte_count;
+        std::cerr << "read exception after " << bytes_processed << " bytes" <<
+            std::endl;
+    }
+    catch (const WriteException& w)
+    {
+        bytes_processed = w.byte_count;
+        std::cerr << "write exception after " << bytes_processed << " bytes" <<
+            std::endl;
+    }
+    return bytes_processed;
 }
