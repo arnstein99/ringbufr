@@ -1,10 +1,12 @@
 #include "netutils.h"
 #include "miscutils.h"
 
+#include <thread>
+#include <chrono>
+using namespace std::chrono_literals;
 #include <string.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
 
 // #define VERBOSE
@@ -58,7 +60,8 @@ int listening_socket(int port_number)
     sa.sin_port = htons ((uint16_t)port_number);
     sa.sin_addr.s_addr = htonl (INADDR_ANY);
     NEGCHECK("bind",
-        (bind (socketFD, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa))));
+        bind_retry(
+            socketFD, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa), 1000));
 
     // Get a client
     NEGCHECK("listen", listen (socketFD, 1));
@@ -96,13 +99,16 @@ void double_listen(
 
     sa.sin_port = htons ((uint16_t)input_port);
     NEGCHECK("bind",
-        (bind (socketFD_in, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa))));
+        bind_retry(
+            socketFD_in, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa),
+            1000));
     set_flags(socketFD_in, O_NONBLOCK);
 
     sa.sin_port = htons ((uint16_t)output_port);
     NEGCHECK("bind",
-        (bind (socketFD_out, (
-            struct sockaddr *)(&sa), (socklen_t)sizeof (sa))));
+        bind_retry(
+            socketFD_out, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa),
+            1000));
     set_flags(socketFD_out, O_NONBLOCK);
 
     // Mark both sockets for listening
@@ -199,4 +205,21 @@ void no_linger(int socket)
     nope.l_linger = 0;
     NEGCHECK("setsockopt",
         setsockopt(socket, SOL_SOCKET, SO_LINGER, &nope, sizeof(nope)));
+}
+
+int bind_retry(
+    int sockfd, const struct sockaddr *addr, socklen_t addrlen, int retries)
+{
+    int result;
+    while (retries-- > 0)
+    {
+        result = bind(sockfd, addr, addrlen);
+        if (result == -1)
+        {
+            if (errno != EADDRINUSE) break;
+            std::this_thread::sleep_for(1us);
+        }
+        break;
+    }
+    return result;
 }

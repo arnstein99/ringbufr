@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unistd.h>
+#include <sys/socket.h>
 
 // Operates on an active socket.
 void set_flags(int fd, int flags);
@@ -19,5 +20,9 @@ void double_listen(
 
 // Disables SO_LINGER on a socket
 void no_linger(int socket);
+
+// Bind, with retries.
+int bind_retry(
+    int sockfd, const struct sockaddr *addr, socklen_t addrlen, int retries);
 
 #endif // __NETUTILS_H_

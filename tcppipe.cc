@@ -112,7 +112,6 @@ int main (int argc, char* argv[])
         two.join();
         if (second_uri.port != -1) close(second_socket);
         if (first_uri.port != -1)  close(first_socket);
-        std::this_thread::sleep_for(100ms);
         std::cerr << "End copy loop" << std::endl;
 
     } while (repeat);
