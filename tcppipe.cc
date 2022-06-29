@@ -91,6 +91,11 @@ int main (int argc, char* argv[])
             }
         }
 
+        // Modify port properties
+        set_flags(first_socket , O_NONBLOCK);
+        set_flags(second_socket, O_NONBLOCK);
+
+        std::cerr << "Begin copy loop" << std::endl;
         std::atomic<bool> continue_flag = true;
         std::thread one([first_socket, second_socket, &continue_flag]()
         {
@@ -105,14 +110,13 @@ int main (int argc, char* argv[])
 
         one.join();
         two.join();
-        close(second_socket);
-        close(first_socket);
+        if (second_uri.port != -1) close(second_socket);
+        if (first_uri.port != -1)  close(first_socket);
         std::this_thread::sleep_for(100ms);
+        std::cerr << "End copy loop" << std::endl;
 
     } while (repeat);
 
-    close(second_socket);
-    close(first_socket);
     return 0;
 }
 
