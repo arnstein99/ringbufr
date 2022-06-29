@@ -3,6 +3,8 @@
 #include <thread>
 #include <iostream>
 #include <cstring>
+#include <chrono>
+using namespace std::chrono_literals;
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "copyfd.h"
@@ -17,7 +19,7 @@ struct Uri
 };
 static Uri process_args(int& argc, char**& argv);
 
-static size_t copy(int sock1, int sock2);
+static size_t copy(int sock1, int sock2, const std::atomic<bool>& cflag);
 static void usage_error();
 
 int main (int argc, char* argv[])
@@ -89,17 +91,23 @@ int main (int argc, char* argv[])
             }
         }
 
-        // Cheap trick: use only one thread, so only have to wait on one
-        // thread.
-        std::thread one([first_socket, second_socket]()
+        std::atomic<bool> continue_flag = true;
+        std::thread one([first_socket, second_socket, &continue_flag]()
         {
-            copy(first_socket, second_socket);
+            copy(first_socket, second_socket, continue_flag);
+            continue_flag = false;
         });
-        copy(second_socket, first_socket);
+        std::thread two([first_socket, second_socket, &continue_flag]()
+        {
+            copy(second_socket, first_socket, continue_flag);
+            continue_flag = false;
+        });
+
+        one.join();
+        two.join();
         close(second_socket);
         close(first_socket);
-        one.join();
-        std::cerr << "joined one" << std::endl;
+        std::this_thread::sleep_for(100ms);
 
     } while (repeat);
 
@@ -166,7 +174,7 @@ void usage_error()
     exit (1);
 }
 
-size_t copy(int sock1, int sock2)
+size_t copy(int sock1, int sock2, const std::atomic<bool>& cflag)
 {
     size_t bytes_processed;
     try
@@ -174,23 +182,21 @@ size_t copy(int sock1, int sock2)
 #ifdef VERBOSE
         std::cerr << "starting copy, socket " << sock1 <<
             " to socket " << sock2 << std::endl;
-        bytes_processed = copyfd(sock1, sock2, 128*1024, 2*1024, 2*1024);
+        bytes_processed =
+            copyfd_while(sock1, sock2, cflag, 500000, 128*1024, 2*1024, 2*1024);
         std::cerr << bytes_processed << " copied" << std::endl;
 #else
-        bytes_processed = copyfd(sock1, sock2, 128*1024, 2*1024, 2*1024);
+        bytes_processed =
+            copyfd_while(sock1, sock2, cflag, 500000, 128*1024, 2*1024, 2*1024);
 #endif
     }
     catch (const ReadException& r)
     {
         bytes_processed = r.byte_count;
-        std::cerr << "read exception after " << bytes_processed << " bytes" <<
-            std::endl;
     }
     catch (const WriteException& w)
     {
         bytes_processed = w.byte_count;
-        std::cerr << "write exception after " << bytes_processed << " bytes" <<
-            std::endl;
     }
     return bytes_processed;
 }

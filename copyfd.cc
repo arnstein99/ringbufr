@@ -19,14 +19,34 @@ using namespace std::chrono;
         /* std::cerr << "checkpoint " << __LINE__ << std::endl; */ \
     } while (false)
 
-size_t
-copyfd(
+size_t copyfd(
     int readfd, int writefd,
+    size_t buffer_size, size_t push_pad, size_t pop_pad)
+{
+    std::atomic<bool> cflag = true;
+    return copyfd_while(
+        readfd, writefd,
+        cflag, 0,
+        buffer_size, push_pad, pop_pad);
+}
+
+size_t copyfd_while(
+    int readfd, int writefd,
+    const std::atomic<bool>& continue_flag, long check_usec,
     size_t buffer_size, size_t push_pad, size_t pop_pad)
 {
     int maxfd = std::max(readfd, writefd) + 1;
     fd_set read_set;
     fd_set write_set;
+    struct timeval tv;
+    struct timeval* tvp = nullptr;
+    if (check_usec != 0)
+    {
+        tv.tv_sec = 0;
+        tv.tv_usec = check_usec;
+        tvp = &tv;
+    }
+
 
     RingbufR<unsigned char> bufr(buffer_size, push_pad, pop_pad);
 
@@ -144,32 +164,32 @@ copyfd(
             int select_return;
             NEGCHECK("select",
                 (select_return = select(
-                    maxfd, p_read_set, p_write_set, nullptr, nullptr)));
+                    maxfd, p_read_set, p_write_set, nullptr, tvp)));
         }
 
 #ifdef VERBOSE
-    if (read_available)
-    {
-        std::cerr << std::setw(7) << std::left << "read" <<
-            std::setw(6) << std::right << bytes_read;
-    }
-    else
-        std::cerr << std::setw(13) << " ";
-    std::cerr << "    ";
-    if (write_available)
-    {
-        std::cerr << std::setw(7) << std::left << "write" <<
-            std::setw(6) << std::right << bytes_write;
-    }
-    else
-        std::cerr << std::setw(13) << "  ";
-    std::cerr << "    ";
-    std::cerr << (p_read_set  ? "x" : "|");
-    std::cerr << (p_write_set ? "x" : "|");
-    std::cerr << std::endl;
+        if (read_available)
+        {
+            std::cerr << std::setw(7) << std::left << "read" <<
+                std::setw(6) << std::right << bytes_read;
+        }
+        else
+            std::cerr << std::setw(13) << " ";
+        std::cerr << "    ";
+        if (write_available)
+        {
+            std::cerr << std::setw(7) << std::left << "write" <<
+                std::setw(6) << std::right << bytes_write;
+        }
+        else
+            std::cerr << std::setw(13) << "  ";
+        std::cerr << "    ";
+        std::cerr << (p_read_set  ? "x" : "|");
+        std::cerr << (p_write_set ? "x" : "|");
+        std::cerr << std::endl;
 #endif
 
-    } while (bytes_read || bytes_write);
+    } while ((bytes_read || bytes_write) && continue_flag);
     // Includes negative values, meaning select() was just called.
 
     return bytes_processed;
