@@ -9,7 +9,7 @@ using namespace std::chrono_literals;
 #include <netdb.h>
 #include <arpa/inet.h>
 
-// #define VERBOSE
+#define VERBOSE
 #ifdef VERBOSE
 #include <iostream>
 #endif
@@ -28,95 +28,69 @@ int socket_from_address(const std::string& hostname, int port_number)
     NEGCHECK("socket", (socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
 
     // Process host name
-    struct hostent* server = gethostbyname(hostname.c_str());
-    if (server == NULL) errorexit("gethostbyname");
     struct sockaddr_in serveraddr;
     bzero((char *) &serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr,
-    (char *)&serveraddr.sin_addr.s_addr, server->h_length);
     serveraddr.sin_port = htons(port_number);
 
-    // Connect to server
-    NEGCHECK ("connect", connect(
-        socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)));
-#ifdef VERBOSE
-    std::cerr << "connected socket " << socketFD << std::endl;
-#endif
+    if (hostname == "")
+    {
+        serveraddr.sin_addr.s_addr = htonl (INADDR_ANY);
+
+        // Bind to address but do not connect to anything
+        NEGCHECK("bind",
+            bind(
+                socketFD,
+                (struct sockaddr *)(&serveraddr),
+                (socklen_t)sizeof (serveraddr)));
+    }
+    else
+    {
+        struct hostent* server = gethostbyname(hostname.c_str());
+        if (server == NULL) errorexit("gethostbyname");
+        bcopy((char *)server->h_addr,
+        (char *)&serveraddr.sin_addr.s_addr, server->h_length);
+
+        // Connect to server
+        NEGCHECK ("connect", connect(
+            socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)));
+        #ifdef VERBOSE
+            std::cerr << "connected socket " << socketFD << std::endl;
+        #endif
+    }
 
     return socketFD;
 }
 
-int listening_socket(int port_number)
+int get_client(int listening_socket)
 {
-    // Create listening socket
-    int socketFD;
-    NEGCHECK("socket",
-        (socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
-    no_linger(socketFD);
-    struct sockaddr_in sa;
-    memset (&sa, 0, sizeof (sa));
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons ((uint16_t)port_number);
-    sa.sin_addr.s_addr = htonl (INADDR_ANY);
-    NEGCHECK("bind",
-        bind_retry(
-            socketFD, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa), 1000));
-
     // Get a client
-    NEGCHECK("listen", listen (socketFD, 1));
+    NEGCHECK("listen", listen (listening_socket, 1));
     struct sockaddr_in addr;
     socklen_t addrlen = (socklen_t)sizeof(addr);
-    int connectFD;
-    NEGCHECK("accept", (connectFD = accept(
-        socketFD, (struct sockaddr*)(&addr), &addrlen)));
-    close(socketFD);
+    int client_socket;
+    NEGCHECK("accept", (client_socket = accept(
+        listening_socket, (struct sockaddr*)(&addr), &addrlen)));
 #ifdef VERBOSE
     std::cerr << "connected" << std::endl;
 #endif
 
-    return connectFD;
+    return client_socket;
 }
 
-void double_listen(
-    int input_port, int output_port, int& input_socket, int& output_socket)
+void get_two_clients(
+    int first_listening_socket, int second_listening_socket,
+    int& first_client_socket, int& second_client_socket)
 {
-    // Create listening sockets
-    int socketFD_in;
-    NEGCHECK("socket",
-        (socketFD_in = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
-    no_linger(socketFD_in);
-    int socketFD_out;
-    NEGCHECK("socket",
-        (socketFD_out = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
-    no_linger(socketFD_out);
-
-    // Bind both sockets
-    struct sockaddr_in sa;
-    memset (&sa, 0, sizeof (sa));
-    sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = htonl (INADDR_ANY);
-
-    sa.sin_port = htons ((uint16_t)input_port);
-    NEGCHECK("bind",
-        bind_retry(
-            socketFD_in, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa),
-            1000));
-    set_flags(socketFD_in, O_NONBLOCK);
-
-    sa.sin_port = htons ((uint16_t)output_port);
-    NEGCHECK("bind",
-        bind_retry(
-            socketFD_out, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa),
-            1000));
-    set_flags(socketFD_out, O_NONBLOCK);
+    set_flags(first_listening_socket , O_NONBLOCK);
+    set_flags(second_listening_socket, O_NONBLOCK);
 
     // Mark both sockets for listening
-    NEGCHECK("listen", listen (socketFD_in,  1));
-    NEGCHECK("listen", listen (socketFD_out, 1));
+    NEGCHECK("listen", listen (first_listening_socket , 1));
+    NEGCHECK("listen", listen (second_listening_socket, 1));
 
     // Get both sockets accepted
-    int connectFD_in = -1, connectFD_out = -1;
+    int first_cl_socket = -1, second_cl_socket = -1;
     do
     {
         struct sockaddr_in addr;
@@ -124,18 +98,21 @@ void double_listen(
         fd_set* p_read_set = nullptr;
         fd_set read_set;
         FD_ZERO(&read_set);
-        int maxfd = std::max(socketFD_in, socketFD_out) + 1;
+        int maxfd =
+            std::max(first_listening_socket, second_listening_socket) + 1;
 
-        if (connectFD_in < 0)
+        if (first_cl_socket < 0)
         {
-            connectFD_in =
-                accept(socketFD_in, (struct sockaddr*)(&addr), &addrlen);
-            if (connectFD_in < 0)
+            first_cl_socket =
+                accept(
+                    first_listening_socket,
+                    (struct sockaddr*)(&addr), &addrlen);
+            if (first_cl_socket < 0)
             {
                 if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
                 {
                     // This is when to select()
-                    FD_SET(socketFD_in, &read_set);
+                    FD_SET(first_listening_socket, &read_set);
                     p_read_set = &read_set;
                 }
                 else
@@ -147,22 +124,24 @@ void double_listen(
 #ifdef VERBOSE
             else
             {
-                std::cerr << "accepted on input socket " << socketFD_in <<
-                std::endl;
+                std::cerr << "accepted on input socket " <<
+                    first_listening_socket << std::endl;
             }
 #endif
         }
 
-        if (connectFD_out < 0)
+        if (second_cl_socket < 0)
         {
-            connectFD_out =
-                accept(socketFD_out, (struct sockaddr*)(&addr), &addrlen);
-            if (connectFD_out < 0)
+            second_cl_socket =
+                accept(
+                    second_listening_socket,
+                    (struct sockaddr*)(&addr), &addrlen);
+            if (second_cl_socket < 0)
             {
                 if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
                 {
                     // This is when to select()
-                    FD_SET(socketFD_out, &read_set);
+                    FD_SET(second_listening_socket, &read_set);
                     p_read_set = &read_set;
                 }
                 else
@@ -174,8 +153,8 @@ void double_listen(
 #ifdef VERBOSE
             else
             {
-                std::cerr << "accepted on output socket " << socketFD_out <<
-                std::endl;
+                std::cerr << "accepted on output socket " <<
+                    second_listening_socket << std::endl;
             }
 #endif
         }
@@ -188,14 +167,12 @@ void double_listen(
                     maxfd, p_read_set, nullptr, nullptr, nullptr)));
         }
 
-    } while ((connectFD_in < 0) || (connectFD_out < 0));
+    } while ((first_cl_socket < 0) || (second_cl_socket < 0));
 #ifdef VERBOSE
     std::cerr << "finished accepts" << std::endl;
 #endif
-    input_socket  = connectFD_in;
-    output_socket = connectFD_out;
-    close(socketFD_in);
-    close(socketFD_out);
+    first_client_socket  = first_cl_socket;
+    second_client_socket = second_cl_socket;
 }
 
 void no_linger(int socket)
@@ -205,21 +182,4 @@ void no_linger(int socket)
     nope.l_linger = 0;
     NEGCHECK("setsockopt",
         setsockopt(socket, SOL_SOCKET, SO_LINGER, &nope, sizeof(nope)));
-}
-
-int bind_retry(
-    int sockfd, const struct sockaddr *addr, socklen_t addrlen, int retries)
-{
-    int result;
-    while (retries-- > 0)
-    {
-        result = bind(sockfd, addr, addrlen);
-        if (result == -1)
-        {
-            if (errno != EADDRINUSE) break;
-            std::this_thread::sleep_for(1us);
-        }
-        break;
-    }
-    return result;
 }

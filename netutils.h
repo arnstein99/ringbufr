@@ -8,21 +8,18 @@
 // Operates on an active socket.
 void set_flags(int fd, int flags);
 
-// Returns connected socket.
+// Returns connected or bound socket.
 int socket_from_address(const std::string& hostname, int port_number);
 
-// Blocks, returns accepted socket.
-int listening_socket(int port_number);
+// Waits for a client
+int get_client(int listening_socket);
 
-// Blocks, finds clients for both ports.
-void double_listen(
-    int input_port, int output_port, int& input_socket, int& output_socket);
+// Waits for two clients.
+void get_two_clients(
+    int first_listening_socket, int second_listening_socket,
+    int& first_client_socket, int& second_client_socket);
 
 // Disables SO_LINGER on a socket
 void no_linger(int socket);
-
-// Bind, with retries.
-int bind_retry(
-    int sockfd, const struct sockaddr *addr, socklen_t addrlen, int retries);
 
 #endif // __NETUTILS_H_

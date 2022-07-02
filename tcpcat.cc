@@ -33,12 +33,20 @@ int main (int argc, char* argv[])
     if (input_uri.listening && output_uri.listening)
     {
         // wait for both URIs to accept
-        double_listen(
-            input_uri.port, output_uri.port, input_socket, output_socket);
+        int temp1 = socket_from_address("", input_uri.port);
+        int temp2 = socket_from_address("", output_uri.port);
+        no_linger(temp1);
+        no_linger(temp2);
+        get_two_clients(temp1, temp2, input_socket, output_socket);
+        close(temp2);
+        close(temp1);
     }
     else if (input_uri.listening)
     {
-        input_socket = listening_socket(input_uri.port);
+        int temp1 = socket_from_address("", input_uri.port);
+        no_linger(temp1);
+        input_socket = get_client(temp1);
+        close(temp1);
         if (output_uri.port == -1)
         {
             output_socket = 1;
@@ -51,7 +59,10 @@ int main (int argc, char* argv[])
     }
     else if (output_uri.listening)
     {
-        output_socket = listening_socket(output_uri.port);
+        int temp2 = socket_from_address("", output_uri.port);
+        no_linger(temp2);
+        output_socket = get_client(temp2);
+        close(temp2);
         if (input_uri.port == -1)
         {
             input_socket = 0;
@@ -99,8 +110,8 @@ int main (int argc, char* argv[])
     copyfd(input_socket, output_socket, 128*1024, 1024, 1024);
 #endif
 
-    close(output_socket);
-    close(input_socket);
+    if (output_uri.port != -1) close(output_socket);
+    if (input_uri.port != -1)  close(input_socket);
     return 0;
 }
 

@@ -3,8 +3,6 @@
 #include <thread>
 #include <iostream>
 #include <cstring>
-#include <chrono>
-using namespace std::chrono_literals;
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "copyfd.h"
@@ -31,21 +29,35 @@ int main (int argc, char* argv[])
     auto first_uri  = process_args(argc_copy, argv_copy);
     auto second_uri = process_args(argc_copy, argv_copy);
     if (argc_copy != 0) usage_error();
-    bool repeat = first_uri.listening || second_uri.listening;
+
+    // Get the listening sockets ready (if any)
+    int first_listener=-1, second_listener=-1;
+    if (first_uri.listening)
+    {
+        first_listener = socket_from_address("", first_uri.port);
+        no_linger(first_listener);
+    }
+    if (second_uri.listening)
+    {
+        second_listener = socket_from_address("", second_uri.port);
+        no_linger(second_listener);
+    }
+
 
     int first_socket=0, second_socket=0;
+    bool repeat = first_uri.listening || second_uri.listening;
     do
     {
         // Special processing for double listen
         if (first_uri.listening && second_uri.listening)
         {
             // wait for both URIs to accept
-            double_listen(
-                first_uri.port, second_uri.port, first_socket, second_socket);
+            get_two_clients(
+                first_listener, second_listener,  first_socket, second_socket);
         }
         else if (first_uri.listening)
         {
-            first_socket = listening_socket(first_uri.port);
+            first_socket = get_client(first_listener);
             if (second_uri.port == -1)
             {
                 second_socket = 1;
@@ -58,7 +70,7 @@ int main (int argc, char* argv[])
         }
         else if (second_uri.listening)
         {
-            second_socket = listening_socket(second_uri.port);
+            second_socket = get_client(second_listener);
             if (first_uri.port == -1)
             {
                 first_socket = 0;
@@ -95,6 +107,7 @@ int main (int argc, char* argv[])
         set_flags(first_socket , O_NONBLOCK);
         set_flags(second_socket, O_NONBLOCK);
 
+        // Both sockets are complete, so copy now.
         std::cerr << "Begin copy loop" << std::endl;
         std::atomic<bool> continue_flag = true;
         std::thread one([first_socket, second_socket, &continue_flag]()
