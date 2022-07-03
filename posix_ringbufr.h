@@ -25,12 +25,12 @@ public:
 protected:
     void updateStart(size_t increment) override
     {
-        auto lock = std::lock_guard(_mutex);
+        const std::lock_guard<std::mutex> lock(_mutex);
         RingbufR<_T>::updateStart(increment);
     }
     void updateEnd(size_t increment) override
     {
-        auto lock = std::lock_guard(_mutex);
+        const std::lock_guard<std::mutex> lock(_mutex);
         RingbufR<_T>::updateEnd(increment);
     }
 

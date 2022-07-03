@@ -109,7 +109,7 @@ int main (int argc, char* argv[])
 
         // Both sockets are complete, so copy now.
         std::cerr << "Begin copy loop" << std::endl;
-        std::atomic<bool> continue_flag = true;
+        std::atomic<bool> continue_flag(true);
         std::thread one([first_socket, second_socket, &continue_flag]()
         {
             copy(first_socket, second_socket, continue_flag);

@@ -23,7 +23,7 @@ size_t copyfd(
     int readfd, int writefd,
     size_t buffer_size, size_t push_pad, size_t pop_pad)
 {
-    std::atomic<bool> cflag = true;
+    std::atomic<bool> cflag(true);
     return copyfd_while(
         readfd, writefd,
         cflag, 0,
