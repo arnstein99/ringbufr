@@ -44,6 +44,9 @@ int socket_from_address(const std::string& hostname, int port_number)
                 socketFD,
                 (struct sockaddr *)(&serveraddr),
                 (socklen_t)sizeof (serveraddr)));
+        #ifdef VERBOSE
+            std::cerr << "bound socket " << socketFD << std::endl;
+        #endif
     }
     else
     {
@@ -73,7 +76,7 @@ int get_client(int listening_socket)
     NEGCHECK("accept", (client_socket = accept(
         listening_socket, (struct sockaddr*)(&addr), &addrlen)));
 #ifdef VERBOSE
-    std::cerr << "connected" << std::endl;
+    std::cerr << "connected socket " << listening_socket << std::endl;
 #endif
 
     return client_socket;
@@ -174,15 +177,6 @@ void get_two_clients(
 #endif
     first_client_socket  = first_cl_socket;
     second_client_socket = second_cl_socket;
-}
-
-void no_linger(int socket)
-{
-    struct linger nope;
-    nope.l_onoff = 1;
-    nope.l_linger = 0;
-    NEGCHECK("setsockopt",
-        setsockopt(socket, SOL_SOCKET, SO_LINGER, &nope, sizeof(nope)));
 }
 
 void set_reuse(int socket)

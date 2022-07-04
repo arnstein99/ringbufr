@@ -56,14 +56,17 @@ int main (int argc, char* argv[])
     };
     auto connect_if = [&uri, &sock] (int index)
     {
-        if (uri[index].port == -1)
+        if (!uri[index].listening)
         {
-            sock[index] = index;
-        }
-        else
-        {
-            sock[index] =
-                socket_from_address(uri[index].hostname, uri[index].port);
+            if (uri[index].port == -1)
+            {
+                sock[index] = index;
+            }
+            else
+            {
+                sock[index] =
+                    socket_from_address(uri[index].hostname, uri[index].port);
+            }
         }
     };
 

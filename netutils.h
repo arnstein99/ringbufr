@@ -19,9 +19,6 @@ void get_two_clients(
     int first_listening_socket, int second_listening_socket,
     int& first_client_socket, int& second_client_socket);
 
-// Disables SO_LINGER on a socket
-void no_linger(int socket);
-
 // SO_REUSEADDR and SO_REUSEPORT
 void set_reuse(int socket);
 
