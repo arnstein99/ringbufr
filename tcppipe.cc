@@ -17,114 +17,98 @@ struct Uri
 };
 static Uri process_args(int& argc, char**& argv);
 
-static size_t copy(int sock1, int sock2, const std::atomic<bool>& cflag);
+static size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag);
 static void usage_error();
 
 int main (int argc, char* argv[])
 {
-    // Process inputs
+    // Process user inputs
     int argc_copy = argc - 1;
     char** argv_copy = argv;
     ++argv_copy;
-    auto first_uri  = process_args(argc_copy, argv_copy);
-    auto second_uri = process_args(argc_copy, argv_copy);
+    Uri uri[2];
+    uri[0] = process_args(argc_copy, argv_copy);
+    uri[1] = process_args(argc_copy, argv_copy);
     if (argc_copy != 0) usage_error();
 
     // Get the listening sockets ready (if any)
-    int first_listener=-1, second_listener=-1;
-    if (first_uri.listening)
+    int listener[2] = {-1, -1};
+    auto socket_if = [&listener, &uri] (int index)
     {
-        first_listener = socket_from_address("", first_uri.port);
-        no_linger(first_listener);
-    }
-    if (second_uri.listening)
+        if (uri[index].listening)
+        {
+            listener[index] = socket_from_address("", uri[index].port);
+        }
+    };
+    socket_if(0);
+    socket_if(1);
+
+    int sock[2] = {0, 0};
+    bool repeat = uri[0].listening || uri[1].listening;
+
+    // These will be used in the following loop
+    auto listen_if = [&uri, &sock, &listener] (int index)
     {
-        second_listener = socket_from_address("", second_uri.port);
-        no_linger(second_listener);
-    }
+        if (uri[index].listening)
+        {
+            sock[index] = get_client(listener[index]);
+        }
+    };
+    auto connect_if = [&uri, &sock] (int index)
+    {
+        if (uri[index].port == -1)
+        {
+            sock[index] = index;
+        }
+        else
+        {
+            sock[index] =
+                socket_from_address(uri[index].hostname, uri[index].port);
+        }
+    };
 
-
-    int first_socket=0, second_socket=0;
-    bool repeat = first_uri.listening || second_uri.listening;
     do
     {
         // Special processing for double listen
-        if (first_uri.listening && second_uri.listening)
+        if (uri[0].listening && uri[1].listening)
         {
             // wait for both URIs to accept
             get_two_clients(
-                first_listener, second_listener,  first_socket, second_socket);
+                listener[0], listener[1],  sock[0], sock[1]);
         }
-        else if (first_uri.listening)
+        else
         {
-            first_socket = get_client(first_listener);
-            if (second_uri.port == -1)
-            {
-                second_socket = 1;
-            }
-            else
-            {
-                second_socket =
-                    socket_from_address(second_uri.hostname, second_uri.port);
-            }
-        }
-        else if (second_uri.listening)
-        {
-            second_socket = get_client(second_listener);
-            if (first_uri.port == -1)
-            {
-                first_socket = 0;
-            }
-            else
-            {
-                first_socket =
-                    socket_from_address(first_uri.hostname, first_uri.port);
-            }
-        }
-        else // no listening
-        {
-            if (first_uri.port == -1)
-            {
-                first_socket = 0;
-            }
-            else
-            {
-                first_socket =
-                    socket_from_address(first_uri.hostname, first_uri.port);
-            }
-            if (second_uri.port == -1)
-            {
-                second_socket = 1;
-            }
-            else
-            {
-                second_socket =
-                    socket_from_address(second_uri.hostname, second_uri.port);
-            }
+            // Wait for client to listening socket, if any.
+            listen_if(0);
+            listen_if(1);
+
+            // Connect client socket and/or pipe socket, if any.
+            connect_if(0);
+            connect_if(1);
         }
 
         // Modify port properties
-        set_flags(first_socket , O_NONBLOCK);
-        set_flags(second_socket, O_NONBLOCK);
+        set_flags(sock[0], O_NONBLOCK);
+        set_flags(sock[1], O_NONBLOCK);
 
         // Both sockets are complete, so copy now.
         std::cerr << "Begin copy loop" << std::endl;
         std::atomic<bool> continue_flag(true);
-        std::thread one([first_socket, second_socket, &continue_flag]()
+        std::thread one([sock, &continue_flag] ()
         {
-            copy(first_socket, second_socket, continue_flag);
+            copy(sock[0], sock[1], continue_flag);
             continue_flag = false;
         });
-        std::thread two([first_socket, second_socket, &continue_flag]()
+        std::thread two([sock, &continue_flag] ()
         {
-            copy(second_socket, first_socket, continue_flag);
+            copy(sock[1], sock[0], continue_flag);
             continue_flag = false;
         });
 
         one.join();
         two.join();
-        if (second_uri.port != -1) close(second_socket);
-        if (first_uri.port != -1)  close(first_socket);
+        if (uri[1].port != -1) close(sock[1]);
+        if (uri[0].port != -1) close(sock[0]);
         std::cerr << "End copy loop" << std::endl;
 
     } while (repeat);
@@ -190,20 +174,22 @@ void usage_error()
     exit (1);
 }
 
-size_t copy(int sock1, int sock2, const std::atomic<bool>& cflag)
+size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
 {
     size_t bytes_processed;
     try
     {
 #ifdef VERBOSE
-        std::cerr << "starting copy, socket " << sock1 <<
-            " to socket " << sock2 << std::endl;
+        std::cerr << "starting copy, FD " << firstFD <<
+            " to FD " << secondFD << std::endl;
         bytes_processed =
-            copyfd_while(sock1, sock2, cflag, 500000, 128*1024, 2*1024, 2*1024);
+            copyfd_while(
+                firstFD, secondFD, cflag, 500000, 128*1024, 2*1024, 2*1024);
         std::cerr << bytes_processed << " copied" << std::endl;
 #else
         bytes_processed =
-            copyfd_while(sock1, sock2, cflag, 500000, 128*1024, 2*1024, 2*1024);
+            copyfd_while
+                (firstFD, secondFD, cflag, 500000, 128*1024, 2*1024, 2*1024);
 #endif
     }
     catch (const ReadException& r)
