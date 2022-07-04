@@ -36,8 +36,6 @@ int main (int argc, char* argv[])
         // Wait for both URIs to accept.
         int temp1 = socket_from_address("", uri[0].port);
         int temp2 = socket_from_address("", uri[1].port);
-        no_linger(temp1);
-        no_linger(temp2);
         get_two_clients(temp1, temp2, socketFD[0], socketFD[1]);
         close(temp2);
         close(temp1);
@@ -50,7 +48,6 @@ int main (int argc, char* argv[])
             if (uri[index].listening)
             {
                 int temp = socket_from_address("", uri[index].port);
-                no_linger(temp);
                 socketFD[index] = get_client(temp);
                 close(temp);
             }
@@ -109,8 +106,8 @@ int main (int argc, char* argv[])
         std::cerr << strerror(w.errn) << std::endl;
     }
 
-    if (uri[1].port != -1) shutdown(socketFD[1], SHUT_RDWR);
-    if (uri[0].port != -1) shutdown(socketFD[0], SHUT_RDWR);
+    if (uri[1].port != -1) close(socketFD[1]);
+    if (uri[0].port != -1) close(socketFD[0]);
     return 0;
 }
 

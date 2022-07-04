@@ -36,6 +36,7 @@ int socket_from_address(const std::string& hostname, int port_number)
     if (hostname == "")
     {
         serveraddr.sin_addr.s_addr = htonl (INADDR_ANY);
+        set_reuse(socketFD);
 
         // Bind to address but do not connect to anything
         NEGCHECK("bind",
@@ -182,4 +183,15 @@ void no_linger(int socket)
     nope.l_linger = 0;
     NEGCHECK("setsockopt",
         setsockopt(socket, SOL_SOCKET, SO_LINGER, &nope, sizeof(nope)));
+}
+
+void set_reuse(int socket)
+{
+    int reuse = 1;
+    NEGCHECK("setsockopt",
+        setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)));
+#ifdef SO_REUSEPORT
+    NEGCHECK("setsockopt",
+        setsockopt(socket, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)));
+#endif
 }

@@ -85,12 +85,6 @@ size_t copyfd_while(
                     FD_SET(readfd, &read_set);
                     p_read_set = &read_set;
                 }
-                else if (errno == ECONNRESET)
-                {
-                    // Handle this as end of data.
-                    std::cerr << "WARNING: ECONNRESET on read" << std::endl;
-                    bytes_read = 0;
-                }
                 else
                 {
                     // Some other error on input
