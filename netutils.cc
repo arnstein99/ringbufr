@@ -9,7 +9,7 @@ using namespace std::chrono_literals;
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#define VERBOSE
+// #define VERBOSE
 #ifdef VERBOSE
 #include <iostream>
 #endif
