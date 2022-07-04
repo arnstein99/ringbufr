@@ -24,94 +24,93 @@ int main (int argc, char* argv[])
     int argc_copy = argc - 1;
     char** argv_copy = argv;
     ++argv_copy;
-    auto input_uri  = process_args(argc_copy, argv_copy);
-    auto output_uri = process_args(argc_copy, argv_copy);
+    Uri uri[2];
+    uri[0]  = process_args(argc_copy, argv_copy);
+    uri[1] = process_args(argc_copy, argv_copy);
     if (argc_copy != 0) usage_error();
+    int socketFD[2] = {0, 0};
 
-    // Special processing for double listen
-    int input_socket=0, output_socket=0;
-    if (input_uri.listening && output_uri.listening)
+    if (uri[0].listening && uri[1].listening)
     {
-        // wait for both URIs to accept
-        int temp1 = socket_from_address("", input_uri.port);
-        int temp2 = socket_from_address("", output_uri.port);
+        // Special processing for double listen.
+        // Wait for both URIs to accept.
+        int temp1 = socket_from_address("", uri[0].port);
+        int temp2 = socket_from_address("", uri[1].port);
         no_linger(temp1);
         no_linger(temp2);
-        get_two_clients(temp1, temp2, input_socket, output_socket);
+        get_two_clients(temp1, temp2, socketFD[0], socketFD[1]);
         close(temp2);
         close(temp1);
     }
-    else if (input_uri.listening)
+    else
     {
-        int temp1 = socket_from_address("", input_uri.port);
-        no_linger(temp1);
-        input_socket = get_client(temp1);
-        close(temp1);
-        if (output_uri.port == -1)
+        // Wait for client to listening socket, if any.
+        auto listen_if = [&] (int index)
         {
-            output_socket = 1;
-        }
-        else
+            if (uri[index].listening)
+            {
+                int temp = socket_from_address("", uri[index].port);
+                no_linger(temp);
+                socketFD[index] = get_client(temp);
+                close(temp);
+            }
+        };
+        listen_if(0);
+        listen_if(1);
+
+        // Connect client socket and/or pipe socket, if any.
+        auto connect_if = [&] (int index)
         {
-            output_socket =
-                socket_from_address(output_uri.hostname, output_uri.port);
-        }
-    }
-    else if (output_uri.listening)
-    {
-        int temp2 = socket_from_address("", output_uri.port);
-        no_linger(temp2);
-        output_socket = get_client(temp2);
-        close(temp2);
-        if (input_uri.port == -1)
-        {
-            input_socket = 0;
-        }
-        else
-        {
-            input_socket =
-                socket_from_address(input_uri.hostname, input_uri.port);
-        }
-    }
-    else // no listening
-    {
-        if (input_uri.port == -1)
-        {
-            input_socket = 0;
-        }
-        else
-        {
-            input_socket =
-                socket_from_address(input_uri.hostname, input_uri.port);
-        }
-        if (output_uri.port == -1)
-        {
-            output_socket = 1;
-        }
-        else
-        {
-            output_socket =
-                socket_from_address(output_uri.hostname, output_uri.port);
-        }
+            if (!uri[index].listening)
+            {
+                if (uri[index].port == -1)
+                {
+                    socketFD[index] = index;
+                }
+                else
+                {
+                    socketFD[index] =
+                        socket_from_address(
+                            uri[index].hostname, uri[index].port);
+                }
+            }
+        };
+        connect_if(0);
+        connect_if(1);
     }
 
     // Modify port properties
-    set_flags(input_socket, O_NONBLOCK|O_RDONLY);
-    set_flags(output_socket, O_NONBLOCK|O_WRONLY);
+    set_flags(socketFD[0], O_NONBLOCK|O_RDONLY);
+    set_flags(socketFD[1], O_NONBLOCK|O_WRONLY);
 
     // Copy!
+    try
+    {
 #ifdef VERBOSE
-    std::cerr << "starting copy, socket " << input_socket <<
-        " to socket " << output_socket << std::endl;
-    auto bytes_processed =
-        copyfd(input_socket, output_socket, 128*1024, 1024, 1024);
-    std::cerr << bytes_processed << " copied" << std::endl;
+        std::cerr << "starting copy, socket " << socketFD[0] <<
+            " to socket " << socketFD[1] << std::endl;
+        auto bytes_processed =
+            copyfd(socketFD[0], socketFD[1], 128*1024, 2*1024, 2*1024);
+        std::cerr << bytes_processed << " copied" << std::endl;
 #else
-    copyfd(input_socket, output_socket, 128*1024, 1024, 1024);
+        copyfd(socketFD[0], socketFD[1], 128*1024, 2*1024, 2*1024);
 #endif
+    }
+    catch (const ReadException& r)
+    {
+        std::cerr << "Read failure after " << r.byte_count << " bytes:" <<
+            std::endl;
+        std::cerr << strerror(r.errn) << std::endl;
+    }
+    catch (const WriteException& w)
+    {
+        std::cerr << "Write failure after " << w.byte_count << " bytes:" <<
+            std::endl;
+        std::cerr << strerror(w.errn) << std::endl;
+    }
 
-    if (output_uri.port != -1) close(output_socket);
-    if (input_uri.port != -1)  close(input_socket);
+    if (uri[1].port != -1) shutdown(socketFD[1], SHUT_RDWR);
+    if (uri[0].port != -1) shutdown(socketFD[0], SHUT_RDWR);
     return 0;
 }
 

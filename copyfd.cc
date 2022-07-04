@@ -68,7 +68,6 @@ size_t copyfd_while(
         {
             CHECKPOINT;
 #ifdef VERBOSE
-            read_available = std::min(read_available, buffer_size);
             auto before = system_clock::now();
 #endif // VERBOSE
             bytes_read = read(readfd, read_start, read_available);
@@ -86,10 +85,16 @@ size_t copyfd_while(
                     FD_SET(readfd, &read_set);
                     p_read_set = &read_set;
                 }
+                else if (errno == ECONNRESET)
+                {
+                    // Handle this as end of data.
+                    std::cerr << "WARNING: ECONNRESET on read" << std::endl;
+                    bytes_read = 0;
+                }
                 else
                 {
                     // Some other error on input
-                    ReadException r(bytes_processed);
+                    ReadException r(errno, bytes_processed);
                     throw(r);
                 }
             }
@@ -135,7 +140,7 @@ size_t copyfd_while(
                 {
                     CHECKPOINT;
                     // Some other error on write
-                    WriteException w(bytes_processed);
+                    WriteException w(errno, bytes_processed);
                     throw(w);
                 }
             }
@@ -143,7 +148,7 @@ size_t copyfd_while(
             {
                 CHECKPOINT;
                 // EOF on write.
-                WriteException w(bytes_processed);
+                WriteException w(0, bytes_processed);
                 throw(w);
             }
             else

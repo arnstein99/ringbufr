@@ -7,18 +7,19 @@
 class IOException
 {
 public:
-    IOException(size_t bc) : byte_count(bc) {}
+    IOException(int ern, size_t bc) : errn(ern), byte_count(bc) {}
+    int errn;
     size_t byte_count;
 };
 class ReadException : public IOException
 {
 public:
-    ReadException(size_t bc) : IOException(bc) {}
+    ReadException(int ern, size_t bc) : IOException(ern, bc) {}
 };
 class WriteException : public IOException
 {
 public:
-    WriteException(size_t bc) : IOException(bc) {}
+    WriteException(int ern, size_t bc) : IOException(ern, bc) {}
 };
 
 size_t copyfd(
