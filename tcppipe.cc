@@ -33,7 +33,7 @@ int main (int argc, char* argv[])
 
     // Get the listening sockets ready (if any)
     int listener[2] = {-1, -1};
-    auto socket_if = [&listener, &uri] (int index)
+    static auto socket_if = [&listener, &uri] (int index)
     {
         if (uri[index].listening)
         {
@@ -44,48 +44,47 @@ int main (int argc, char* argv[])
     socket_if(1);
 
     int sock[2] = {0, 0};
+    std::atomic<bool> continue_flag;
     bool repeat = uri[0].listening || uri[1].listening;
 
-    // These will be used in the following loop
-    auto listen_if = [&uri, &sock, &listener] (int index)
-    {
-        if (uri[index].listening)
-        {
-            sock[index] = get_client(listener[index]);
-        }
-    };
-    auto connect_if = [&uri, &sock] (int index)
-    {
-        if (!uri[index].listening)
-        {
-            if (uri[index].port == -1)
-            {
-                sock[index] = index;
-            }
-            else
-            {
-                sock[index] =
-                    socket_from_address(uri[index].hostname, uri[index].port);
-            }
-        }
-    };
-
+    // Loop over copy tasks
     do
     {
         // Special processing for double listen
         if (uri[0].listening && uri[1].listening)
         {
             // wait for both URIs to accept
-            get_two_clients(
-                listener[0], listener[1],  sock[0], sock[1]);
+            get_two_clients(listener, sock);
         }
         else
         {
             // Wait for client to listening socket, if any.
+            static auto listen_if = [&uri, &sock, &listener] (int index)
+            {
+                if (uri[index].listening)
+                {
+                    sock[index] = get_client(listener[index]);
+                }
+            };
             listen_if(0);
             listen_if(1);
 
             // Connect client socket and/or pipe socket, if any.
+            static auto connect_if = [&uri, &sock] (int index)
+            {
+                if (!uri[index].listening)
+                {
+                    if (uri[index].port == -1)
+                    {
+                        sock[index] = index;
+                    }
+                    else
+                    {
+                        sock[index] =
+                            socket_from_address(uri[index].hostname, uri[index].port);
+                    }
+                }
+            };
             connect_if(0);
             connect_if(1);
         }
@@ -96,20 +95,22 @@ int main (int argc, char* argv[])
 
         // Both sockets are complete, so copy now.
         std::cerr << "Begin copy loop" << std::endl;
-        std::atomic<bool> continue_flag(true);
-        std::thread one([sock, &continue_flag] ()
+        continue_flag = true;
+        static auto proc1 = [&sock, &continue_flag] ()
         {
             copy(sock[0], sock[1], continue_flag);
             continue_flag = false;
-        });
-        std::thread two([sock, &continue_flag] ()
+        };
+        std::thread one(proc1);
+        static auto proc2 = [&sock, &continue_flag] ()
         {
             copy(sock[1], sock[0], continue_flag);
             continue_flag = false;
-        });
+        };
+        std::thread two(proc2);
 
-        one.join();
         two.join();
+        one.join();
         if (uri[1].port != -1) close(sock[1]);
         if (uri[0].port != -1) close(sock[0]);
         std::cerr << "End copy loop" << std::endl;
@@ -149,12 +150,11 @@ static Uri process_args(int& argc, char**& argv)
     else if (strcmp(option, "-connect") == 0)
     {
         uri.listening = false;
-        if (argc < 1) usage_error();
+        if (argc < 2) usage_error();
         const char* value = argv[0];
+        uri.hostname = value;
         --argc;
         ++argv;
-        uri.hostname = value;
-        if (argc < 1) usage_error();
         uri.port = std::stoi(argv[0]);
         --argc;
         ++argv;
@@ -197,11 +197,15 @@ size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
     }
     catch (const ReadException& r)
     {
-        bytes_processed = r.byte_count;
+        std::cerr << "Read failure after " << r.byte_count << " bytes:" <<
+            std::endl;
+        std::cerr << strerror(r.errn) << std::endl;
     }
     catch (const WriteException& w)
     {
-        bytes_processed = w.byte_count;
+        std::cerr << "Write failure after " << w.byte_count << " bytes:" <<
+            std::endl;
+        std::cerr << strerror(w.errn) << std::endl;
     }
     return bytes_processed;
 }

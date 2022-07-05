@@ -15,9 +15,7 @@ int socket_from_address(const std::string& hostname, int port_number);
 int get_client(int listening_socket);
 
 // Waits for two clients.
-void get_two_clients(
-    int first_listening_socket, int second_listening_socket,
-    int& first_client_socket, int& second_client_socket);
+void get_two_clients(const int listening_socket[2], int client_socket[2]);
 
 // SO_REUSEADDR and SO_REUSEPORT
 void set_reuse(int socket);

@@ -68,7 +68,6 @@ int socket_from_address(const std::string& hostname, int port_number)
 
 int get_client(int listening_socket)
 {
-    // Get a client
     NEGCHECK("listen", listen (listening_socket, 1));
     struct sockaddr_in addr;
     socklen_t addrlen = (socklen_t)sizeof(addr);
@@ -77,24 +76,24 @@ int get_client(int listening_socket)
         listening_socket, (struct sockaddr*)(&addr), &addrlen)));
 #ifdef VERBOSE
     std::cerr << "connected socket " << listening_socket << std::endl;
+    std::cerr << "accepted socket " << client_socket <<
+        " on listening socket " << listening_socket << std::endl;
 #endif
 
     return client_socket;
 }
 
-void get_two_clients(
-    int first_listening_socket, int second_listening_socket,
-    int& first_client_socket, int& second_client_socket)
+void get_two_clients(const int listening_socket[2], int client_socket[2])
 {
-    set_flags(first_listening_socket , O_NONBLOCK);
-    set_flags(second_listening_socket, O_NONBLOCK);
+    set_flags(listening_socket[0], O_NONBLOCK);
+    set_flags(listening_socket[1], O_NONBLOCK);
 
     // Mark both sockets for listening
-    NEGCHECK("listen", listen (first_listening_socket , 1));
-    NEGCHECK("listen", listen (second_listening_socket, 1));
+    NEGCHECK("listen", listen (listening_socket[0], 1));
+    NEGCHECK("listen", listen (listening_socket[1], 1));
 
     // Get both sockets accepted
-    int first_cl_socket = -1, second_cl_socket = -1;
+    int cl_socket[2] = {-1, -1};
     do
     {
         struct sockaddr_in addr;
@@ -103,65 +102,42 @@ void get_two_clients(
         fd_set read_set;
         FD_ZERO(&read_set);
         int maxfd =
-            std::max(first_listening_socket, second_listening_socket) + 1;
+            std::max(listening_socket[0], listening_socket[1]) + 1;
 
-        if (first_cl_socket < 0)
+        static auto no_wait_listen = [&] (int index)
         {
-            first_cl_socket =
-                accept(
-                    first_listening_socket,
-                    (struct sockaddr*)(&addr), &addrlen);
-            if (first_cl_socket < 0)
+            if (cl_socket[index] < 0)
             {
-                if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+                cl_socket[index] =
+                    accept(
+                        listening_socket[index],
+                        (struct sockaddr*)(&addr), &addrlen);
+                if (cl_socket[index] < 0)
                 {
-                    // This is when to select()
-                    FD_SET(first_listening_socket, &read_set);
-                    p_read_set = &read_set;
+                    if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+                    {
+                        // This is when to select()
+                        FD_SET(listening_socket[index], &read_set);
+                        p_read_set = &read_set;
+                    }
+                    else
+                    {
+                        // Some other error on input
+                        errorexit("accept");
+                    }
                 }
+#ifdef VERBOSE
                 else
                 {
-                    // Some other error on input
-                    errorexit("accept");
+                    std::cerr << "accepted socket " << cl_socket[index] <<
+                        " on listening socket " << listening_socket[index] <<
+                        std::endl;
                 }
-            }
-#ifdef VERBOSE
-            else
-            {
-                std::cerr << "accepted on input socket " <<
-                    first_listening_socket << std::endl;
-            }
 #endif
-        }
-
-        if (second_cl_socket < 0)
-        {
-            second_cl_socket =
-                accept(
-                    second_listening_socket,
-                    (struct sockaddr*)(&addr), &addrlen);
-            if (second_cl_socket < 0)
-            {
-                if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
-                {
-                    // This is when to select()
-                    FD_SET(second_listening_socket, &read_set);
-                    p_read_set = &read_set;
-                }
-                else
-                {
-                    // Some other error on input
-                    errorexit("accept");
-                }
             }
-#ifdef VERBOSE
-            else
-            {
-                std::cerr << "accepted on output socket " <<
-                    second_listening_socket << std::endl;
-            }
-#endif
-        }
+        };
+        no_wait_listen(0);
+        no_wait_listen(1);
 
         if (p_read_set)
         {
@@ -171,12 +147,12 @@ void get_two_clients(
                     maxfd, p_read_set, nullptr, nullptr, nullptr)));
         }
 
-    } while ((first_cl_socket < 0) || (second_cl_socket < 0));
+    } while ((cl_socket[0] < 0) || (cl_socket[1] < 0));
 #ifdef VERBOSE
     std::cerr << "finished accepts" << std::endl;
 #endif
-    first_client_socket  = first_cl_socket;
-    second_client_socket = second_cl_socket;
+    client_socket[0] = cl_socket[0];
+    client_socket[1] = cl_socket[1];
 }
 
 void set_reuse(int socket)

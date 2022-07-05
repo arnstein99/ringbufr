@@ -34,16 +34,17 @@ int main (int argc, char* argv[])
     {
         // Special processing for double listen.
         // Wait for both URIs to accept.
-        int temp1 = socket_from_address("", uri[0].port);
-        int temp2 = socket_from_address("", uri[1].port);
-        get_two_clients(temp1, temp2, socketFD[0], socketFD[1]);
-        close(temp2);
-        close(temp1);
+        int temp[2];
+        temp[0] = socket_from_address("", uri[0].port);
+        temp[1] = socket_from_address("", uri[1].port);
+        get_two_clients(temp, socketFD);
+        close(temp[0]);
+        close(temp[1]);
     }
     else
     {
         // Wait for client to listening socket, if any.
-        auto listen_if = [&] (int index)
+        static auto listen_if = [&uri, &socketFD] (int index)
         {
             if (uri[index].listening)
             {
@@ -56,7 +57,7 @@ int main (int argc, char* argv[])
         listen_if(1);
 
         // Connect client socket and/or pipe socket, if any.
-        auto connect_if = [&] (int index)
+        static auto connect_if = [&uri, &socketFD] (int index)
         {
             if (!uri[index].listening)
             {
