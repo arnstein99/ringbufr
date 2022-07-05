@@ -76,7 +76,7 @@ int main (int argc, char* argv[])
                 {
                     if (uri[index].port == -1)
                     {
-                        sock[index] = index;
+                        sock[index] = -1;
                     }
                     else
                     {
@@ -88,10 +88,6 @@ int main (int argc, char* argv[])
             connect_if(0);
             connect_if(1);
         }
-
-        // Modify port properties
-        set_flags(sock[0], O_NONBLOCK);
-        set_flags(sock[1], O_NONBLOCK);
 
         // Both sockets are complete, so copy now.
         std::cerr << "Begin copy loop" << std::endl;
@@ -180,6 +176,10 @@ void usage_error()
 size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
 {
     size_t bytes_processed;
+    if (firstFD  == -1) firstFD  = 0;
+    if (secondFD == -1) secondFD = 1;
+    set_flags(firstFD , O_NONBLOCK);
+    set_flags(secondFD, O_NONBLOCK);
     try
     {
 #ifdef VERBOSE
