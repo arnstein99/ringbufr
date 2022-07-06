@@ -177,11 +177,11 @@ void usage_error()
 
 size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
 {
-    size_t bytes_processed;
     if (firstFD  == -1) firstFD  = 0;
     if (secondFD == -1) secondFD = 1;
     set_flags(firstFD , O_NONBLOCK);
     set_flags(secondFD, O_NONBLOCK);
+    size_t bytes_processed = 0;
     try
     {
 #if (VERBOSE >= 1)
