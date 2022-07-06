@@ -3,21 +3,21 @@
 
 #include <string>
 #include <unistd.h>
+#include <sys/socket.h>
 
-// Operates on an active socket.
+// Operates on an active file descriptor.
 void set_flags(int fd, int flags);
 
-// Returns connected socket.
+// Returns connected or bound socket.
 int socket_from_address(const std::string& hostname, int port_number);
 
-// Blocks, returns accepted socket.
-int listening_socket(int port_number);
+// Waits for a client
+int get_client(int listening_socket);
 
-// Blocks, finds clients for both ports.
-void double_listen(
-    int input_port, int output_port, int& input_socket, int& output_socket);
+// Waits for two clients.
+void get_two_clients(const int listening_socket[2], int client_socket[2]);
 
-// Disables SO_LINGER on a socket
-void no_linger(int socket);
+// SO_REUSEADDR and SO_REUSEPORT
+void set_reuse(int socket);
 
 #endif // __NETUTILS_H_

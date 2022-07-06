@@ -1,14 +1,15 @@
 #include "netutils.h"
 #include "miscutils.h"
 
+#include <thread>
+#include <chrono>
+using namespace std::chrono_literals;
 #include <string.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
 
-// #define VERBOSE
-#ifdef VERBOSE
+#if (VERBOSE >= 1)
 #include <iostream>
 #endif
 
@@ -26,153 +27,116 @@ int socket_from_address(const std::string& hostname, int port_number)
     NEGCHECK("socket", (socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
 
     // Process host name
-    struct hostent* server = gethostbyname(hostname.c_str());
-    if (server == NULL) errorexit("gethostbyname");
     struct sockaddr_in serveraddr;
     bzero((char *) &serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr,
-    (char *)&serveraddr.sin_addr.s_addr, server->h_length);
     serveraddr.sin_port = htons(port_number);
 
-    // Connect to server
-    NEGCHECK ("connect", connect(
-        socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)));
-#ifdef VERBOSE
-    std::cerr << "connected socket " << socketFD << std::endl;
+    if (hostname == "")
+    {
+        serveraddr.sin_addr.s_addr = htonl (INADDR_ANY);
+        set_reuse(socketFD);
+
+        // Bind to address but do not connect to anything
+        NEGCHECK("bind",
+            bind(
+                socketFD,
+                (struct sockaddr *)(&serveraddr),
+                (socklen_t)sizeof (serveraddr)));
+#if (VERBOSE >= 1)
+            std::cerr << "bound socket " << socketFD << std::endl;
 #endif
+    }
+    else
+    {
+        struct hostent* server = gethostbyname(hostname.c_str());
+        if (server == NULL) errorexit("gethostbyname");
+        bcopy((char *)server->h_addr,
+        (char *)&serveraddr.sin_addr.s_addr, server->h_length);
+
+        // Connect to server
+        NEGCHECK ("connect", connect(
+            socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)));
+#if (VERBOSE >= 1)
+            std::cerr << "connected socket " << socketFD << std::endl;
+#endif
+    }
 
     return socketFD;
 }
 
-int listening_socket(int port_number)
+int get_client(int listening_socket)
 {
-    // Create listening socket
-    int socketFD;
-    NEGCHECK("socket",
-        (socketFD = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
-    no_linger(socketFD);
-    struct sockaddr_in sa;
-    memset (&sa, 0, sizeof (sa));
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons ((uint16_t)port_number);
-    sa.sin_addr.s_addr = htonl (INADDR_ANY);
-    NEGCHECK("bind",
-        (bind (socketFD, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa))));
-
-    // Get a client
-    NEGCHECK("listen", listen (socketFD, 1));
+    NEGCHECK("listen", listen (listening_socket, 1));
     struct sockaddr_in addr;
     socklen_t addrlen = (socklen_t)sizeof(addr);
-    int connectFD;
-    NEGCHECK("accept", (connectFD = accept(
-        socketFD, (struct sockaddr*)(&addr), &addrlen)));
-    close(socketFD);
-#ifdef VERBOSE
-    std::cerr << "connected" << std::endl;
+    int client_socket;
+    NEGCHECK("accept", (client_socket = accept(
+        listening_socket, (struct sockaddr*)(&addr), &addrlen)));
+#if (VERBOSE >= 1)
+    std::cerr << "connected socket " << listening_socket << std::endl;
+    std::cerr << "accepted socket " << client_socket <<
+        " on listening socket " << listening_socket << std::endl;
 #endif
 
-    return connectFD;
+    return client_socket;
 }
 
-void double_listen(
-    int input_port, int output_port, int& input_socket, int& output_socket)
+void get_two_clients(const int listening_socket[2], int client_socket[2])
 {
-    // Create listening sockets
-    int socketFD_in;
-    NEGCHECK("socket",
-        (socketFD_in = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
-    no_linger(socketFD_in);
-    int socketFD_out;
-    NEGCHECK("socket",
-        (socketFD_out = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)));
-    no_linger(socketFD_out);
-
-    // Bind both sockets
-    struct sockaddr_in sa;
-    memset (&sa, 0, sizeof (sa));
-    sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = htonl (INADDR_ANY);
-
-    sa.sin_port = htons ((uint16_t)input_port);
-    NEGCHECK("bind",
-        (bind (socketFD_in, (struct sockaddr *)(&sa), (socklen_t)sizeof (sa))));
-    set_flags(socketFD_in, O_NONBLOCK);
-
-    sa.sin_port = htons ((uint16_t)output_port);
-    NEGCHECK("bind",
-        (bind (socketFD_out, (
-            struct sockaddr *)(&sa), (socklen_t)sizeof (sa))));
-    set_flags(socketFD_out, O_NONBLOCK);
+    set_flags(listening_socket[0], O_NONBLOCK);
+    set_flags(listening_socket[1], O_NONBLOCK);
 
     // Mark both sockets for listening
-    NEGCHECK("listen", listen (socketFD_in,  1));
-    NEGCHECK("listen", listen (socketFD_out, 1));
+    NEGCHECK("listen", listen (listening_socket[0], 1));
+    NEGCHECK("listen", listen (listening_socket[1], 1));
 
     // Get both sockets accepted
-    int connectFD_in = -1, connectFD_out = -1;
+    int maxfd =
+        std::max(listening_socket[0], listening_socket[1]) + 1;
+    fd_set read_set;
+    int cl_socket[2] = {-1, -1};
     do
     {
-        struct sockaddr_in addr;
-        socklen_t addrlen = (socklen_t)sizeof(addr);
         fd_set* p_read_set = nullptr;
-        fd_set read_set;
         FD_ZERO(&read_set);
-        int maxfd = std::max(socketFD_in, socketFD_out) + 1;
 
-        if (connectFD_in < 0)
+        static auto no_wait_listen = [&] (int index)
         {
-            connectFD_in =
-                accept(socketFD_in, (struct sockaddr*)(&addr), &addrlen);
-            if (connectFD_in < 0)
+            if (cl_socket[index] < 0)
             {
-                if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+                struct sockaddr_in addr;
+                socklen_t addrlen = (socklen_t)sizeof(addr);
+                cl_socket[index] =
+                    accept(
+                        listening_socket[index],
+                        (struct sockaddr*)(&addr), &addrlen);
+                if (cl_socket[index] < 0)
                 {
-                    // This is when to select()
-                    FD_SET(socketFD_in, &read_set);
-                    p_read_set = &read_set;
+                    if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+                    {
+                        // This is when to select()
+                        FD_SET(listening_socket[index], &read_set);
+                        p_read_set = &read_set;
+                    }
+                    else
+                    {
+                        // Some other error on input
+                        errorexit("accept");
+                    }
                 }
+#if (VERBOSE >= 1)
                 else
                 {
-                    // Some other error on input
-                    errorexit("accept");
+                    std::cerr << "accepted socket " << cl_socket[index] <<
+                        " on listening socket " << listening_socket[index] <<
+                        std::endl;
                 }
-            }
-#ifdef VERBOSE
-            else
-            {
-                std::cerr << "accepted on input socket " << socketFD_in <<
-                std::endl;
-            }
 #endif
-        }
-
-        if (connectFD_out < 0)
-        {
-            connectFD_out =
-                accept(socketFD_out, (struct sockaddr*)(&addr), &addrlen);
-            if (connectFD_out < 0)
-            {
-                if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
-                {
-                    // This is when to select()
-                    FD_SET(socketFD_out, &read_set);
-                    p_read_set = &read_set;
-                }
-                else
-                {
-                    // Some other error on input
-                    errorexit("accept");
-                }
             }
-#ifdef VERBOSE
-            else
-            {
-                std::cerr << "accepted on output socket " << socketFD_out <<
-                std::endl;
-            }
-#endif
-        }
+        };
+        no_wait_listen(0);
+        no_wait_listen(1);
 
         if (p_read_set)
         {
@@ -182,21 +146,21 @@ void double_listen(
                     maxfd, p_read_set, nullptr, nullptr, nullptr)));
         }
 
-    } while ((connectFD_in < 0) || (connectFD_out < 0));
-#ifdef VERBOSE
+    } while ((cl_socket[0] < 0) || (cl_socket[1] < 0));
+#if (VERBOSE >= 1)
     std::cerr << "finished accepts" << std::endl;
 #endif
-    input_socket  = connectFD_in;
-    output_socket = connectFD_out;
-    close(socketFD_in);
-    close(socketFD_out);
+    client_socket[0] = cl_socket[0];
+    client_socket[1] = cl_socket[1];
 }
 
-void no_linger(int socket)
+void set_reuse(int socket)
 {
-    struct linger nope;
-    nope.l_onoff = 1;
-    nope.l_linger = 0;
+    int reuse = 1;
     NEGCHECK("setsockopt",
-        setsockopt(socket, SOL_SOCKET, SO_LINGER, &nope, sizeof(nope)));
+        setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)));
+#ifdef SO_REUSEPORT
+    NEGCHECK("setsockopt",
+        setsockopt(socket, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)));
+#endif
 }
