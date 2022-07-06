@@ -93,21 +93,21 @@ void get_two_clients(const int listening_socket[2], int client_socket[2])
     NEGCHECK("listen", listen (listening_socket[1], 1));
 
     // Get both sockets accepted
+    int maxfd =
+        std::max(listening_socket[0], listening_socket[1]) + 1;
+    fd_set read_set;
     int cl_socket[2] = {-1, -1};
     do
     {
-        struct sockaddr_in addr;
-        socklen_t addrlen = (socklen_t)sizeof(addr);
         fd_set* p_read_set = nullptr;
-        fd_set read_set;
         FD_ZERO(&read_set);
-        int maxfd =
-            std::max(listening_socket[0], listening_socket[1]) + 1;
 
         static auto no_wait_listen = [&] (int index)
         {
             if (cl_socket[index] < 0)
             {
+                struct sockaddr_in addr;
+                socklen_t addrlen = (socklen_t)sizeof(addr);
                 cl_socket[index] =
                     accept(
                         listening_socket[index],

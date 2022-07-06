@@ -63,6 +63,7 @@ int main (int argc, char* argv[])
             {
                 if (uri[index].port == -1)
                 {
+                    // This covers both stdin and stdout
                     socketFD[index] = index;
                 }
                 else
@@ -137,7 +138,7 @@ static Uri process_args(int& argc, char**& argv)
         const char* value = argv[0];
         ++argv;
         --argc;
-        uri.port = std::stoi(value);
+        uri.port = mstoi(value);
     }
     else if (strcmp(option, "-connect") == 0)
     {
@@ -148,7 +149,7 @@ static Uri process_args(int& argc, char**& argv)
         ++argv;
         uri.hostname = value;
         if (argc < 1) usage_error();
-        uri.port = std::stoi(argv[0]);
+        uri.port = mstoi(argv[0]);
         --argc;
         ++argv;
     }

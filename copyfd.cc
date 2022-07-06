@@ -14,11 +14,6 @@
 using namespace std::chrono;
 #endif // VERBOSE
 
-#define CHECKPOINT \
-    do { \
-        /* std::cerr << "checkpoint " << __LINE__ << std::endl; */ \
-    } while (false)
-
 size_t copyfd(
     int readfd, int writefd,
     size_t buffer_size, size_t push_pad, size_t pop_pad)
@@ -62,11 +57,9 @@ size_t copyfd_while(
 
         unsigned char* read_start;
         bufr.pushInquire(read_available, read_start);
-        CHECKPOINT;
         bytes_read = 0;
         if (read_available)
         {
-            CHECKPOINT;
 #ifdef VERBOSE
             auto before = system_clock::now();
 #endif // VERBOSE
@@ -109,7 +102,6 @@ size_t copyfd_while(
         bufr.popInquire(write_available, write_start);
         if (write_available)
         {
-            CHECKPOINT;
 #ifdef VERBOSE
             auto before = system_clock::now();
 #endif // VERBOSE
@@ -121,10 +113,8 @@ size_t copyfd_while(
 #endif // VERBOSE
             if (bytes_write < 0)
             {
-                CHECKPOINT;
                 if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
                 {
-                    CHECKPOINT;
                     // This is when to select().
                     FD_ZERO(&write_set);
                     FD_SET(writefd, &write_set);
@@ -132,7 +122,6 @@ size_t copyfd_while(
                 }
                 else
                 {
-                    CHECKPOINT;
                     // Some other error on write
                     WriteException w(errno, bytes_processed);
                     throw(w);
@@ -140,14 +129,12 @@ size_t copyfd_while(
             }
             else if (bytes_write == 0)
             {
-                CHECKPOINT;
                 // EOF on write.
                 WriteException w(0, bytes_processed);
                 throw(w);
             }
             else
             {
-                CHECKPOINT;
                 // Some data was output, no need to select.
                 bufr.pop(bytes_write);
                 bytes_processed += bytes_write;

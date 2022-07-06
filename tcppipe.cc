@@ -69,19 +69,21 @@ int main (int argc, char* argv[])
             listen_if(0);
             listen_if(1);
 
-            // Connect client socket and/or pipe socket, if any.
+            // Connect client socket and/or stdio socket, if any.
             static auto connect_if = [&uri, &sock] (int index)
             {
                 if (!uri[index].listening)
                 {
                     if (uri[index].port == -1)
                     {
+                        // Will replace this with 0 or 1 eventually
                         sock[index] = -1;
                     }
                     else
                     {
                         sock[index] =
-                            socket_from_address(uri[index].hostname, uri[index].port);
+                            socket_from_address(
+                                uri[index].hostname, uri[index].port);
                     }
                 }
             };
@@ -118,7 +120,7 @@ int main (int argc, char* argv[])
 
 static Uri process_args(int& argc, char**& argv)
 // Group can be one of
-//     -pipe
+//     -stdio
 //     -listen <port
 //     -connect <hostname> <port>
 {
@@ -129,7 +131,7 @@ static Uri process_args(int& argc, char**& argv)
     ++argv;
     --argc;
 
-    if (strcmp(option, "-pipe") == 0)
+    if (strcmp(option, "-stdio") == 0)
     {
         uri.listening = false;
         uri.port = -1;
@@ -141,7 +143,7 @@ static Uri process_args(int& argc, char**& argv)
         const char* value = argv[0];
         ++argv;
         --argc;
-        uri.port = std::stoi(value);
+        uri.port = mstoi(value);
     }
     else if (strcmp(option, "-connect") == 0)
     {
@@ -151,7 +153,7 @@ static Uri process_args(int& argc, char**& argv)
         uri.hostname = value;
         --argc;
         ++argv;
-        uri.port = std::stoi(argv[0]);
+        uri.port = mstoi(argv[0]);
         --argc;
         ++argv;
     }
@@ -167,7 +169,7 @@ void usage_error()
     std::cerr << "Usage: tcppipe <first_spec> <second_spec>" << std::endl;
     std::cerr << "Each of <first_spec> and <second_spec> can be one of" <<
         std::endl;
-    std::cerr << "    -pipe" << std::endl;
+    std::cerr << "    -stdio" << std::endl;
     std::cerr << "    -listen <port_number>" << std::endl;
     std::cerr << "    -connect <hostname> <port_number>" << std::endl;
     exit (1);
