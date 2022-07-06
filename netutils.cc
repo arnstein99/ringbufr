@@ -9,8 +9,7 @@ using namespace std::chrono_literals;
 #include <netdb.h>
 #include <arpa/inet.h>
 
-// #define VERBOSE
-#ifdef VERBOSE
+#if (VERBOSE >= 1)
 #include <iostream>
 #endif
 
@@ -44,9 +43,9 @@ int socket_from_address(const std::string& hostname, int port_number)
                 socketFD,
                 (struct sockaddr *)(&serveraddr),
                 (socklen_t)sizeof (serveraddr)));
-        #ifdef VERBOSE
+#if (VERBOSE >= 1)
             std::cerr << "bound socket " << socketFD << std::endl;
-        #endif
+#endif
     }
     else
     {
@@ -58,9 +57,9 @@ int socket_from_address(const std::string& hostname, int port_number)
         // Connect to server
         NEGCHECK ("connect", connect(
             socketFD, (struct sockaddr*)(&serveraddr), sizeof(serveraddr)));
-        #ifdef VERBOSE
+#if (VERBOSE >= 1)
             std::cerr << "connected socket " << socketFD << std::endl;
-        #endif
+#endif
     }
 
     return socketFD;
@@ -74,7 +73,7 @@ int get_client(int listening_socket)
     int client_socket;
     NEGCHECK("accept", (client_socket = accept(
         listening_socket, (struct sockaddr*)(&addr), &addrlen)));
-#ifdef VERBOSE
+#if (VERBOSE >= 1)
     std::cerr << "connected socket " << listening_socket << std::endl;
     std::cerr << "accepted socket " << client_socket <<
         " on listening socket " << listening_socket << std::endl;
@@ -126,7 +125,7 @@ void get_two_clients(const int listening_socket[2], int client_socket[2])
                         errorexit("accept");
                     }
                 }
-#ifdef VERBOSE
+#if (VERBOSE >= 1)
                 else
                 {
                     std::cerr << "accepted socket " << cl_socket[index] <<
@@ -148,7 +147,7 @@ void get_two_clients(const int listening_socket[2], int client_socket[2])
         }
 
     } while ((cl_socket[0] < 0) || (cl_socket[1] < 0));
-#ifdef VERBOSE
+#if (VERBOSE >= 1)
     std::cerr << "finished accepts" << std::endl;
 #endif
     client_socket[0] = cl_socket[0];

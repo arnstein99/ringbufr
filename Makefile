@@ -1,5 +1,5 @@
 ifneq ($(strip $(VERBOSE)),)
-    CPPFLAGS += -DVERBOSE
+    CPPFLAGS += -DVERBOSE=$(VERBOSE)
 endif
 CCFLAGS += -std=c++2a -g -Wall
 LDLIBS += -lpthread

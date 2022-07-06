@@ -184,7 +184,7 @@ size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
     set_flags(secondFD, O_NONBLOCK);
     try
     {
-#ifdef VERBOSE
+#if (VERBOSE >= 1)
         std::cerr << "starting copy, FD " << firstFD <<
             " to FD " << secondFD << std::endl;
         bytes_processed =

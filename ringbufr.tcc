@@ -4,8 +4,6 @@
 
 #include <cassert>
 #include <algorithm>
-// Debug code
-#include <iostream>
 
 template<typename _T>
 RingbufR<_T>::RingbufR (size_t capacity, size_t push_pad, size_t pop_pad)

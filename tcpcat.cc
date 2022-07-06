@@ -85,7 +85,7 @@ int main (int argc, char* argv[])
     // Copy!
     try
     {
-#ifdef VERBOSE
+#if (VERBOSE >= 1)
         std::cerr << "starting copy, socket " << socketFD[0] <<
             " to socket " << socketFD[1] << std::endl;
         auto bytes_processed =

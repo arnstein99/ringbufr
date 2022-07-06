@@ -6,9 +6,9 @@
 #include <algorithm>
 #include <cstring>
 #include <unistd.h>
-#include <iostream>
 
 #ifdef VERBOSE
+#include <iostream>
 #include <iomanip>
 #include <chrono>
 using namespace std::chrono;
@@ -60,11 +60,11 @@ size_t copyfd_while(
         bytes_read = 0;
         if (read_available)
         {
-#ifdef VERBOSE
+#if (VERBOSE >= 3)
             auto before = system_clock::now();
 #endif // VERBOSE
             bytes_read = read(readfd, read_start, read_available);
-#ifdef VERBOSE
+#if (VERBOSE >= 3)
             auto after = system_clock::now();
             auto dur = duration_cast<milliseconds>(after - before).count();
             std::cerr << "read time " << dur << std::endl;
@@ -102,11 +102,11 @@ size_t copyfd_while(
         bufr.popInquire(write_available, write_start);
         if (write_available)
         {
-#ifdef VERBOSE
+#if (VERBOSE >= 3)
             auto before = system_clock::now();
 #endif // VERBOSE
             bytes_write = write(writefd, write_start, write_available);
-#ifdef VERBOSE
+#if (VERBOSE >= 3)
             auto after = system_clock::now();
             auto dur = duration_cast<milliseconds>(after - before).count();
             std::cerr << "write time " << dur << std::endl;
@@ -153,7 +153,7 @@ size_t copyfd_while(
                     maxfd, p_read_set, p_write_set, nullptr, tvp)));
         }
 
-#ifdef VERBOSE
+#if (VERBOSE >= 2)
         if (read_available)
         {
             std::cerr << std::setw(7) << std::left << "read" <<
