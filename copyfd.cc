@@ -1,5 +1,6 @@
 #include "copyfd.h"
 #include "miscutils.h"
+#include "netutils.h"
 
 #include "ringbufr.h"
 #include <sys/select.h>
