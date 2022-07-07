@@ -164,3 +164,18 @@ void set_reuse(int socket)
         setsockopt(socket, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)));
 #endif
 }
+
+ssize_t p_read(int fd, void *buf, size_t count)
+{
+    return read(fd, buf, count);
+}
+ssize_t p_write(int fd, void *buf, size_t count)
+{
+    return write(fd, buf, count);
+}
+int p_select(
+    int nfds, fd_set *readfds, fd_set *writefds,
+    fd_set *exceptfds, struct timeval *timeout)
+{
+    return select(nfds, readfds, writefds, exceptfds, timeout);
+}

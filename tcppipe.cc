@@ -5,6 +5,7 @@
 #include <cstring>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <gperftools/profiler.h>
 #include "copyfd.h"
 #include "miscutils.h"
 #include "netutils.h"
@@ -17,7 +18,7 @@ struct Uri
 };
 static Uri process_args(int& argc, char**& argv);
 
-static size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag);
+size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag);
 static void usage_error();
 
 int main (int argc, char* argv[])
@@ -33,7 +34,7 @@ int main (int argc, char* argv[])
 
     // Get the listening sockets ready (if any)
     int listener[2] = {-1, -1};
-    static auto socket_if = [&listener, &uri] (int index)
+    auto socket_if = [&listener, &uri] (int index)
     {
         if (uri[index].listening)
         {
@@ -59,7 +60,7 @@ int main (int argc, char* argv[])
         else
         {
             // Wait for client to listening socket, if any.
-            static auto listen_if = [&uri, &sock, &listener] (int index)
+            auto listen_if = [&uri, &sock, &listener] (int index)
             {
                 if (uri[index].listening)
                 {
@@ -70,7 +71,7 @@ int main (int argc, char* argv[])
             listen_if(1);
 
             // Connect client socket and/or stdio socket, if any.
-            static auto connect_if = [&uri, &sock] (int index)
+            auto connect_if = [&uri, &sock] (int index)
             {
                 if (!uri[index].listening)
                 {
@@ -94,14 +95,16 @@ int main (int argc, char* argv[])
         // Both sockets are complete, so copy now.
         std::cerr << "Begin copy loop" << std::endl;
         continue_flag = true;
-        static auto proc1 = [&sock, &continue_flag] ()
+        auto proc1 = [&sock, &continue_flag] ()
         {
+            ProfilerRegisterThread();
             copy(sock[0], sock[1], continue_flag);
             continue_flag = false;
         };
         std::thread one(proc1);
-        static auto proc2 = [&sock, &continue_flag] ()
+        auto proc2 = [&sock, &continue_flag] ()
         {
+            ProfilerRegisterThread();
             copy(sock[1], sock[0], continue_flag);
             continue_flag = false;
         };

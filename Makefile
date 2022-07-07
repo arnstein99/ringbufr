@@ -1,8 +1,8 @@
 ifneq ($(strip $(VERBOSE)),)
     CPPFLAGS += -DVERBOSE=$(VERBOSE)
 endif
-CCFLAGS += -std=c++2a -g -Wall
-LDLIBS += -lpthread
+CCFLAGS += -std=c++2a -g -Wall -O
+LDLIBS += -lprofiler -lpthread
 LINK.o = c++ $(LDFLAGS)
 COMPILE.cc = c++ -c $(CCFLAGS) $(CPPFLAGS)
 

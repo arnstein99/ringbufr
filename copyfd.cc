@@ -63,7 +63,7 @@ size_t copyfd_while(
 #if (VERBOSE >= 3)
             auto before = system_clock::now();
 #endif // VERBOSE
-            bytes_read = read(readfd, read_start, read_available);
+            bytes_read = p_read(readfd, read_start, read_available);
 #if (VERBOSE >= 3)
             auto after = system_clock::now();
             auto dur = duration_cast<milliseconds>(after - before).count();
@@ -105,7 +105,7 @@ size_t copyfd_while(
 #if (VERBOSE >= 3)
             auto before = system_clock::now();
 #endif // VERBOSE
-            bytes_write = write(writefd, write_start, write_available);
+            bytes_write = p_write(writefd, write_start, write_available);
 #if (VERBOSE >= 3)
             auto after = system_clock::now();
             auto dur = duration_cast<milliseconds>(after - before).count();
@@ -149,7 +149,7 @@ size_t copyfd_while(
         {
             int select_return;
             NEGCHECK("select",
-                (select_return = select(
+                (select_return = p_select(
                     maxfd, p_read_set, p_write_set, nullptr, tvp)));
         }
 
