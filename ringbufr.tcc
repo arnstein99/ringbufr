@@ -13,7 +13,7 @@ namespace {
         template<>                                                   \
         inline void qcopy<atype>(atype* dest, atype* src, size_t n)  \
         {                                                            \
-            if (n) memcpy(dest, src, sizeof(atype)*n);               \
+            memcpy(dest, src, sizeof(atype)*n);                      \
         }
     SPECIALIZE_QCOPY(bool)
     SPECIALIZE_QCOPY(unsigned char)
@@ -208,38 +208,39 @@ void RingbufR<_T>::updateStart(size_t increment)
 
     // Update complete.
     _pop_next = new_next;
+    if (_pop_next == _ring_end) _pop_next = _ring_start;
+    _empty = (_pop_next == _push_next);
 
-    // Shift buffer to minimize edge effects. Two cases to consider.
-    if (_push_next <= _pop_next)
+    if (!_empty)
     {
-        // Wrap-around is in effect. Maybe eliminate it.
-        size_t stub_data = _ring_end - _pop_next;
-        if (stub_data < _pop_pad)
+        // Shift buffer to minimize edge effects. Two cases to consider.
+        if (_push_next <= _pop_next)
         {
-            // The stub data is too small. Try to shift it.
-            size_t buffer_available = _ring_start - _edge_start;
-            if (buffer_available >= stub_data)
+            // Wrap-around is in effect. Maybe eliminate it.
+            size_t stub_data = _ring_end - _pop_next;
+            if (stub_data < _pop_pad)
             {
-                _ring_start -= stub_data;
-                _ring_end   -= stub_data;
-                qcopy(_ring_start, _pop_next, stub_data);
-                _pop_next = _ring_start;
+                // The stub data is too small. Try to shift it.
+                size_t buffer_available = _ring_start - _edge_start;
+                if (buffer_available >= stub_data)
+                {
+                    _ring_start -= stub_data;
+                    _ring_end   -= stub_data;
+                    qcopy(_ring_start, _pop_next, stub_data);
+                    _pop_next = _ring_start;
+                }
             }
         }
+        else
+        {
+            // Wrap-around is not in effect, try to shift buffer to the right.
+            size_t unused_ring = _pop_next - _ring_start;
+            size_t unused_buffer = _edge_end - _ring_end;
+            size_t right_shift = std::min(unused_ring, unused_buffer);
+            _ring_start += right_shift;
+            _ring_end   += right_shift;
+        }
     }
-    else
-    {
-        // Wrap-around is not in effect, try to shift buffer to the right.
-        size_t unused_ring = _pop_next - _ring_start;
-        size_t unused_buffer = _edge_end - _ring_end;
-        size_t right_shift = std::min(unused_ring, unused_buffer);
-        _ring_start += right_shift;
-        _ring_end   += right_shift;
-    }
-
-    if (_pop_next == _ring_end) _pop_next = _ring_start;
-
-    _empty = (_pop_next == _push_next);
 }
 
 template<typename _T>
