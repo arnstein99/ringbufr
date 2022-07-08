@@ -4,6 +4,43 @@
 
 #include <cassert>
 #include <algorithm>
+#include <string.h>
+
+namespace {
+    template<typename _T>
+    inline void qcopy(_T* dest, _T* src, size_t n);
+    #define SPECIALIZE_QCOPY(atype)                                  \
+        template<>                                                   \
+        inline void qcopy<atype>(atype* dest, atype* src, size_t n)  \
+        {                                                            \
+            if (n) memcpy(dest, src, sizeof(atype)*n);               \
+        }
+    SPECIALIZE_QCOPY(bool)
+    SPECIALIZE_QCOPY(unsigned char)
+    SPECIALIZE_QCOPY(char)
+    SPECIALIZE_QCOPY(unsigned short)
+    SPECIALIZE_QCOPY(short)
+    SPECIALIZE_QCOPY(unsigned int)
+    SPECIALIZE_QCOPY(int)
+    SPECIALIZE_QCOPY(unsigned long)
+    SPECIALIZE_QCOPY(long)
+    SPECIALIZE_QCOPY(unsigned long long)
+    SPECIALIZE_QCOPY(long long)
+    SPECIALIZE_QCOPY(float)
+    SPECIALIZE_QCOPY(double)
+    SPECIALIZE_QCOPY(long double)
+    template<typename _T>
+    inline void qcopy(_T* dest, _T* src, size_t n)
+    {
+        while (n-- > 0)
+        {
+            // *dest++ = std::move(src++);
+            auto& des = *dest++;
+            auto& sr  = *src++;
+            des = std::move(sr);
+        }
+    }
+}
 
 template<typename _T>
 RingbufR<_T>::RingbufR (size_t capacity, size_t push_pad, size_t pop_pad)
@@ -185,15 +222,7 @@ void RingbufR<_T>::updateStart(size_t increment)
             {
                 _ring_start -= stub_data;
                 _ring_end   -= stub_data;
-                _T* source = _pop_next;
-                _T* dest   = _ring_start;
-                while (stub_data-- > 0)
-                {
-                    // *dest++ = std::move(source++);
-                    auto& des = *dest++;
-                    auto& sour = *source++;
-                    des = std::move(sour);
-                }
+                qcopy(_ring_start, _pop_next, stub_data);
                 _pop_next = _ring_start;
             }
         }
