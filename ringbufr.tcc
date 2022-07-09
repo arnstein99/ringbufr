@@ -90,9 +90,8 @@ void RingbufR<_T>::pushInquire(size_t& available, _T*& start) const
     start = _push_next;
 }
 
-// push
 template<typename _T>
-void RingbufR<_T>::updateEnd(size_t increment)
+void RingbufR<_T>::push(size_t increment)
 {
     if (increment == 0) return;
 
@@ -147,12 +146,6 @@ void RingbufR<_T>::updateEnd(size_t increment)
 }
 
 template<typename _T>
-void RingbufR<_T>::push(size_t newContent)
-{
-    updateEnd(newContent);
-}
-
-template<typename _T>
 void RingbufR<_T>::popInquire(size_t& available, _T*& start) const
 {
     if (_empty)
@@ -177,7 +170,7 @@ void RingbufR<_T>::popInquire(size_t& available, _T*& start) const
 
 // pop
 template<typename _T>
-void RingbufR<_T>::updateStart(size_t increment)
+void RingbufR<_T>::pop(size_t increment)
 {
     if (increment == 0) return;
 
@@ -213,11 +206,15 @@ void RingbufR<_T>::updateStart(size_t increment)
 
     if (!_empty)
     {
-        // Shift buffer to minimize edge effects. Two cases to consider.
+        // Buffer shifts
         if (_push_next <= _pop_next)
         {
-            // Wrap-around is in effect. Maybe eliminate it.
+            // Wrap-around is in effect
             size_t stub_data = _ring_end - _pop_next;
+
+            // Programming note: we know * _pop_next != _ring_end,
+            // so stub_data != 0.
+
             if (stub_data < _pop_pad)
             {
                 // The stub data is too small. Try to shift it.
@@ -233,10 +230,11 @@ void RingbufR<_T>::updateStart(size_t increment)
         }
         else
         {
-            // Wrap-around is not in effect, try to shift buffer to the right.
+            // Wrap-around is not in effect.
             size_t unused_ring = _pop_next - _ring_start;
             size_t unused_buffer = _edge_end - _ring_end;
             size_t right_shift = std::min(unused_ring, unused_buffer);
+            // Shift buffer to the left to recover from past shifts.
             _ring_start += right_shift;
             _ring_end   += right_shift;
         }
@@ -244,22 +242,22 @@ void RingbufR<_T>::updateStart(size_t increment)
 }
 
 template<typename _T>
-void RingbufR<_T>::pop(size_t oldContent)
-{
-    updateStart(oldContent);
-}
-
-template<typename _T>
 size_t RingbufR<_T>::size() const
 {
     if (_empty) return 0;
-    if (_push_next <= _pop_next)
+    if (_push_next < _pop_next)
     {
         // Wrap-around is in effect
         return (_ring_end - _pop_next) + (_push_next - _ring_start);
     }
-    else
+    else if (_push_next == _pop_next)
     {
+        // Ring buffer is full
+        return (_ring_end - _ring_start);
+    }
+    else // (_push_next > _pop_next)
+    {
+        // Wrap-around is not in effect
         return (_push_next - _pop_next);
     }
 }

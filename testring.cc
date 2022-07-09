@@ -7,8 +7,9 @@
 #include <thread>
 #include <stdio.h>
 #include <chrono>
+#include <mutex>
 using namespace std::chrono_literals;
-#include "posix_ringbufr.h"
+#include "ringbufr.h"
 
 // Tuning
 static const int read_usleep_range  = 500000;
@@ -17,8 +18,10 @@ static const size_t buffer_size = 37 + 7 + 6;
 static const size_t push_pad = 7;
 static const size_t pop_pad = 6;
 static const size_t verbose = 1;
-#define USE_POSIX
 #define DEFAULT_RUN_SECONDS 300
+
+static std::mutex ringMutex;
+int last_read_value, last_write_value;
 
 void itoa(int num, char* str)
 {
@@ -89,12 +92,7 @@ int my_rand(int lower, int upper)
     return lower + rand() % (upper - lower);
 }
 
-#ifdef USE_POSIX
-static Posix_RingbufR<TestClass> rbuf(
-    buffer_size, push_pad, pop_pad);
-#else
 static RingbufR<TestClass> rbuf (buffer_size, push_pad, pop_pad);
-#endif
 static bool running = true;
 
 static void Reader ();
@@ -138,6 +136,7 @@ int main (int argc, char* argv[])
     running = false;
     hWriter.join();
     hReader.join();
+    assert (last_read_value == last_write_value);
 }
 
 static void Writer ()
@@ -150,6 +149,7 @@ static void Writer ()
         std::this_thread::sleep_for(write_usleep * 1us);
         size_t available;
         TestClass* start;
+        const std::lock_guard<std::mutex> lock(ringMutex);
         rbuf.pushInquire(available, start);
         write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
@@ -159,6 +159,7 @@ static void Writer ()
             if (verbose >= 1)
             {
                 std::cout << "(will push " << count <<
+                    "/" << available <<
                     " at " << start - buffer <<
                     " starting with value " << serial + 1 << ")" << std::endl;
             }
@@ -176,8 +177,14 @@ static void Writer ()
                 std::cout << "Write failure" << std::endl;
                 exit(1);
             }
+            last_write_value = serial;
             std::cout << "size is now " << rbuf.size() <<
                 ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
+        }
+        else
+        {
+            assert (rbuf.size() == (buffer_size - push_pad - pop_pad));
+            std::cout << "(will push 0 (buffer is full))" << std::endl;
         }
     }
 }
@@ -193,6 +200,7 @@ static void Reader ()
         std::this_thread::sleep_for(read_usleep * 1us);
         size_t available;
         TestClass* start;
+        const std::lock_guard<std::mutex> lock(ringMutex);
         rbuf.popInquire(available, start);
         read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);
@@ -201,6 +209,7 @@ static void Reader ()
             size_t count = my_rand(1, available);
             if (verbose >= 1)
                 std::cout << "(will pop " << count <<
+                "/" << available <<
                 " starting at " << start - buffer << ")" << std::endl;
             for (size_t i = 0 ; i < count ; ++i)
             {
@@ -223,12 +232,18 @@ static void Reader ()
                 std::cout << "Read failure " << std::endl;
                 exit(1);
             }
+            last_read_value = serial;
             std::cout << "size is now " << rbuf.size() <<
                 ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
         }
-        else if (!running)
+        else
         {
-            break;
+            assert(rbuf.size() == 0);
+            std::cout << "(will pop 0 (buffer is empty))" << std::endl;
+            if (!running)
+            {
+                break;
+            }
         }
     }
 }

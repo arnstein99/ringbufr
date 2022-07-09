@@ -38,20 +38,15 @@ public:
     RingbufR& operator=(const RingbufR&) = delete;
     RingbufR& operator=(RingbufR&&) = delete;
 
-    void pushInquire(size_t& available, _T*& start) const;
+    virtual void pushInquire(size_t& available, _T*& start) const;
     void push(size_t newContent);
-    void popInquire(size_t& available, _T*& start) const;
+    virtual void popInquire(size_t& available, _T*& start) const;
     void pop(size_t oldContent);
     size_t size() const;
 
     // For debugging
     const _T* buffer_start() const;
     const _T* ring_start() const;
-
-protected:
-
-    virtual void updateStart(size_t increment);
-    virtual void updateEnd(size_t increment);
 
 private:
 
