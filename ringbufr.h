@@ -65,6 +65,8 @@ private:
     _T* _pop_next;
     _T* _ring_start;
     _T* _ring_end;
+    bool _push_shifted;
+    bool _pop_shifted;
 };
 
 #endif // __RINGBUFR_H_

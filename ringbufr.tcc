@@ -59,6 +59,8 @@ RingbufR<_T>::RingbufR (size_t capacity, size_t push_pad, size_t pop_pad)
     _push_next  = _ring_start;
     _pop_next   = _ring_start;
     _empty = true;
+    _push_shifted = false;
+    _pop_shifted = false;
 }
 
 template<typename _T>
@@ -125,14 +127,15 @@ void RingbufR<_T>::updateEnd(size_t increment)
 
     // Update complete. Shift buffer to left if appropriate.
     _push_next = new_next;
-    if (_push_next > _pop_next)
+    if (!_push_shifted)
     {
+        assert (_push_next > _pop_next);
         // Wrap-around is not in effect, can proceed.
         size_t unused_ring = _ring_end - _push_next;
-        if (unused_ring < _push_pad)
+        if (unused_ring && (unused_ring < _push_pad))
         {
-            // Unused space at right of ring buffer is too small. May lead to
-            // fragmentation.
+            // Unused space at right of ring buffer is too small. May lead
+            // to fragmentation.
             size_t unused_edge = _ring_start - _edge_start;
             if (unused_edge >= unused_ring)
             {
@@ -140,6 +143,7 @@ void RingbufR<_T>::updateEnd(size_t increment)
                 _ring_start -= unused_ring;
                 _ring_end   -= unused_ring;
             }
+            _push_shifted = true;
         }
     }
 
@@ -214,8 +218,9 @@ void RingbufR<_T>::updateStart(size_t increment)
     if (!_empty)
     {
         // Shift buffer to minimize edge effects. Two cases to consider.
-        if (_push_next <= _pop_next)
+        if (!_pop_shifted)
         {
+            assert (_push_next <= _pop_next);
             // Wrap-around is in effect. Maybe eliminate it.
             size_t stub_data = _ring_end - _pop_next;
             if (stub_data < _pop_pad)
@@ -228,17 +233,23 @@ void RingbufR<_T>::updateStart(size_t increment)
                     _ring_end   -= stub_data;
                     qcopy(_ring_start, _pop_next, stub_data);
                     _pop_next = _ring_start;
+                    _push_shifted = false;
                 }
             }
         }
+        // TODO: resume here.
         else
         {
             // Wrap-around is not in effect, try to shift buffer to the right.
             size_t unused_ring = _pop_next - _ring_start;
             size_t unused_buffer = _edge_end - _ring_end;
             size_t right_shift = std::min(unused_ring, unused_buffer);
-            _ring_start += right_shift;
-            _ring_end   += right_shift;
+            if (right_shift)
+            {
+                _ring_start += right_shift;
+                _ring_end   += right_shift;
+                _push_shifted = false;
+            }
         }
     }
 }
