@@ -47,6 +47,7 @@ public:
     // For debugging
     const _T* buffer_start() const;
     const _T* ring_start() const;
+    const _T* ring_end() const;
 
 private:
 
@@ -55,6 +56,8 @@ private:
     const size_t _pop_pad;
     _T* const _edge_start;
     _T* const _edge_end;
+    _T* const _neutral_start;
+    _T* const _neutral_end;
     bool _empty;
     _T* _push_next;
     _T* _pop_next;

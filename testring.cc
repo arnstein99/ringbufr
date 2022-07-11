@@ -12,11 +12,11 @@ using namespace std::chrono_literals;
 #include "ringbufr.h"
 
 // Tuning
-static const int read_usleep_range  = 500000;
-static const int write_usleep_range = 500000;
-static const size_t buffer_size = 37 + 7 + 6;
+static const int read_usleep_range  = 50000;
+static const int write_usleep_range = 50000;
 static const size_t push_pad = 7;
 static const size_t pop_pad = 6;
+static const size_t ring_size = 37;
 static const size_t verbose = 1;
 #define DEFAULT_RUN_SECONDS 300
 
@@ -92,7 +92,8 @@ int my_rand(int lower, int upper)
     return lower + rand() % (upper - lower);
 }
 
-static RingbufR<TestClass> rbuf (buffer_size, push_pad, pop_pad);
+static RingbufR<TestClass> rbuf (
+    ring_size + push_pad + pop_pad, push_pad, pop_pad);
 static bool running = true;
 
 static void Reader ();
@@ -151,6 +152,10 @@ static void Writer ()
         TestClass* start;
         const std::lock_guard<std::mutex> lock(ringMutex);
         rbuf.pushInquire(available, start);
+        size_t expected_available = std::min(
+            pop_pad,
+            ring_size - std::min(ring_size, rbuf.size()));
+        assert(available >= expected_available);
         write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
         if (available)
@@ -179,11 +184,12 @@ static void Writer ()
             }
             last_write_value = serial;
             std::cout << "size is now " << rbuf.size() <<
-                ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
+                ", ring is (" << rbuf.ring_start() - buffer <<
+                "," << rbuf.ring_end() - buffer << ")" <<std::endl;
         }
         else
         {
-            assert (rbuf.size() == (buffer_size - push_pad - pop_pad));
+            assert (rbuf.size() >= ring_size);
             std::cout << "(will push 0 (buffer is full))" << std::endl;
         }
     }
@@ -202,6 +208,10 @@ static void Reader ()
         TestClass* start;
         const std::lock_guard<std::mutex> lock(ringMutex);
         rbuf.popInquire(available, start);
+        size_t expected_available = std::min(
+            pop_pad,
+            std::min(ring_size, rbuf.size()));
+        assert(available >= expected_available);
         read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);
         if (available)
@@ -234,7 +244,8 @@ static void Reader ()
             }
             last_read_value = serial;
             std::cout << "size is now " << rbuf.size() <<
-                ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
+                ", ring is (" << rbuf.ring_start() - buffer <<
+                "," << rbuf.ring_end() - buffer << ")" <<std::endl;
         }
         else
         {

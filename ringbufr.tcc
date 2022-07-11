@@ -48,14 +48,16 @@ RingbufR<_T>::RingbufR (size_t capacity, size_t push_pad, size_t pop_pad)
       _push_pad(push_pad),
       _pop_pad(pop_pad),
       _edge_start(new _T[capacity]),
-      _edge_end(_edge_start + capacity)
+      _edge_end(_edge_start + capacity),
+      _neutral_start(_edge_start + pop_pad),
+      _neutral_end(_edge_end - push_pad)
 {
     if (capacity <= (push_pad + pop_pad))
     {
         throw (RingbufRArgumentException());
     }
-    _ring_start = _edge_start + push_pad + pop_pad;
-    _ring_end   = _ring_start + _capacity;
+    _ring_start = _neutral_start;
+    _ring_end   = _neutral_end;
     _push_next  = _ring_start;
     _pop_next   = _ring_start;
     _empty = true;
@@ -122,22 +124,25 @@ void RingbufR<_T>::push(size_t increment)
         throw RingbufRFullException();
     }
 
-    // Update complete. Shift buffer to left if appropriate.
+    // Update complete. Shift buffer to avoid short push later.
     _push_next = new_next;
     if (_push_next > _pop_next)
     {
-        // Wrap-around is not in effect, can proceed.
+        // Wrap-around is not in effect, should proceed.
         size_t unused_ring = _ring_end - _push_next;
         if (unused_ring < _push_pad)
         {
             // Unused space at right of ring buffer is too small. May lead to
             // fragmentation.
-            size_t unused_edge = _ring_start - _edge_start;
-            if (unused_edge >= unused_ring)
+            if (_push_next > _neutral_end)
             {
-                // Shift left
-                _ring_start -= unused_ring;
-                _ring_end   -= unused_ring;
+                // Push pad already in use. Don't use it again.
+                _ring_end = _push_next;
+            }
+            else
+            {
+                // Make the push pad available
+                _ring_end = _push_next + _push_pad;
             }
         }
     }
@@ -207,9 +212,9 @@ void RingbufR<_T>::pop(size_t increment)
     if (!_empty)
     {
         // Buffer shifts
-        if (_push_next <= _pop_next)
+        if (_push_next < _pop_next)
         {
-            // Wrap-around is in effect
+            // Wrap-around is in effect, should proceed.
             size_t stub_data = _ring_end - _pop_next;
 
             // Programming note: we know * _pop_next != _ring_end,
@@ -217,26 +222,26 @@ void RingbufR<_T>::pop(size_t increment)
 
             if (stub_data < _pop_pad)
             {
-                // The stub data is too small. Try to shift it.
-                size_t buffer_available = _ring_start - _edge_start;
-                if (buffer_available >= stub_data)
+                // The stub data is too small. 
+                if (_ring_start < _neutral_start)
                 {
+                    // Pop pad already in use. Don't use it again.
+                    size_t reverse_stub = _neutral_start - _ring_start;
+                    _T* dest = _pop_next - reverse_stub;
+                    assert(dest >= _push_next);
+                    qcopy(dest, _ring_start, reverse_stub);
+                    _ring_start = _neutral_start;
+                    _pop_next = dest;
+                }
+                else
+                {
+                    // Make the push pad available
                     _ring_start -= stub_data;
-                    _ring_end   -= stub_data;
+                    assert(_ring_start >= _edge_start);
                     qcopy(_ring_start, _pop_next, stub_data);
                     _pop_next = _ring_start;
                 }
             }
-        }
-        else
-        {
-            // Wrap-around is not in effect.
-            size_t unused_ring = _pop_next - _ring_start;
-            size_t unused_buffer = _edge_end - _ring_end;
-            size_t right_shift = std::min(unused_ring, unused_buffer);
-            // Shift buffer to the left to recover from past shifts.
-            _ring_start += right_shift;
-            _ring_end   += right_shift;
         }
     }
 }
@@ -263,15 +268,21 @@ size_t RingbufR<_T>::size() const
 }
 
 template<typename _T>
+const _T* RingbufR<_T>::buffer_start() const
+{
+    return _edge_start;
+}
+
+template<typename _T>
 const _T* RingbufR<_T>::ring_start() const
 {
     return _ring_start;
 }
 
 template<typename _T>
-const _T* RingbufR<_T>::buffer_start() const
+const _T* RingbufR<_T>::ring_end() const
 {
-    return _edge_start;
+    return _ring_end;
 }
 
 #endif // __RINGBUFR_TCC
