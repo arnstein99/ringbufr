@@ -2,7 +2,6 @@
 #ifndef __RINGBUFR_TCC
 #define __RINGBUFR_TCC
 
-static int overlap_fail = 0;
 static int scarce_fail = 0;
 
 #include <cassert>
@@ -158,6 +157,16 @@ void RingbufR<_T>::push(size_t increment)
 
     // Update complete. Shift buffer to avoid short push later.
     _push_next = new_next;
+    adjustEnd();
+    if (_push_next == _ring_end) _push_next = _ring_start;
+
+    // A stub may have been created.
+    adjustStart();
+}
+
+template<typename _T>
+void RingbufR<_T>::adjustEnd()
+{
     if (_push_next > _pop_next)
     {
         // Wrap-around is not in effect, should proceed.
@@ -178,10 +187,6 @@ void RingbufR<_T>::push(size_t increment)
             }
         }
     }
-
-    if (_push_next == _ring_end) _push_next = _ring_start;
-    // A stub may have been created.
-    adjustStart();
 }
 
 template<typename _T>
@@ -244,6 +249,10 @@ void RingbufR<_T>::pop(size_t increment)
     auto state = getState();
     adjustStart();
     state = getState();
+
+    // A small free space may have just been created
+    adjustEnd();
+    if (_push_next == _ring_end) _push_next = _ring_start;
 }
 
 template<typename _T>
@@ -280,35 +289,32 @@ void RingbufR<_T>::adjustStart()
                     size_t available =
                         std::min(_neutral_start, _push_next) - _ring_start;
                     size_t reverse_stub = _pop_pad - stub_data;
-                    if (available >= reverse_stub)
+                    if (available < reverse_stub)
                     {
-                        _T* new_pop = _pop_next - reverse_stub;
-                        if (new_pop >= _push_next)
-                        {
-                            // Shift stub to left to make room
-                            validate(_ring_start, _push_next - _ring_start);
-                            qmove(new_pop, _pop_next, _ring_end - _pop_next);
-                            validate(new_pop, _ring_end - _pop_next);
-                            // Now we can move the leftmost data into place
-                            qcopy(
-                                _ring_end - reverse_stub, _ring_start,
-                                reverse_stub);
-                            validate(_ring_end - reverse_stub, reverse_stub);
-                            validate(new_pop, _pop_pad);
-                            _ring_start += reverse_stub;
-                            assert(_ring_start <= _neutral_start);
-                            _pop_next = new_pop;
-                            assert((_pop_next + _pop_pad) == _ring_end);
-                            validate(_pop_next, _pop_pad);
-                        }
-                        else
-                        {
-                            ++scarce_fail;
-                        }
+                        reverse_stub = available;
+                    }
+                    _T* new_pop = _pop_next - reverse_stub;
+                    if (new_pop >= _push_next)
+                    {
+                        // Shift stub to left to make room
+                        validate(_ring_start, _push_next - _ring_start);
+                        qmove(new_pop, _pop_next, _ring_end - _pop_next);
+                        validate(new_pop, _ring_end - _pop_next);
+                        // Now we can move the leftmost data into place
+                        qcopy(
+                            _ring_end - reverse_stub, _ring_start,
+                            reverse_stub);
+                        validate(_ring_end - reverse_stub, reverse_stub);
+                        validate(new_pop, _ring_end - _pop_next + reverse_stub);
+                        _ring_start += reverse_stub;
+                        assert(_ring_start <= _neutral_start);
+                        _pop_next = new_pop;
+                        // assert((_pop_next + ???) == _ring_end);
+                        // validate(_pop_next, ???);
                     }
                     else
                     {
-                        ++overlap_fail;
+                        ++scarce_fail;
                     }
                 }
             }

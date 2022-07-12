@@ -64,6 +64,7 @@ public:
 private:
 
     void adjustStart();
+    void adjustEnd();
 
     const size_t _capacity;
     const size_t _push_pad;
