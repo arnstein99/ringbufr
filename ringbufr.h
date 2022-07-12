@@ -48,8 +48,22 @@ public:
     const _T* buffer_start() const;
     const _T* ring_start() const;
     const _T* ring_end() const;
+    static void validate(const _T* start, size_t count);
+    struct debugState
+    {
+        size_t ring_start;
+        size_t ring_end;
+        size_t neutral_start;
+        size_t neutral_end;
+        size_t push_next;
+        size_t pop_next;
+        bool  empty;
+    };
+    debugState getState() const;
 
 private:
+
+    void adjustStart();
 
     const size_t _capacity;
     const size_t _push_pad;

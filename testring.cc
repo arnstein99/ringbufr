@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cassert>
 #include <cstring>
 #include <iostream>
 #include <errno.h>
@@ -83,6 +84,15 @@ std::ostream& operator<<(std::ostream& ost, const TestClass& tc)
 {
     return tc.print(ost);
 }
+template <>
+void RingbufR<TestClass>::validate(const TestClass* start, size_t count)
+{
+    auto serial = start->serial();
+    for (size_t index = 1 ; index < count ; ++index)
+    {
+        assert (++serial == start[index].serial());
+    }
+}
 
 const TestClass* buffer;
 
@@ -153,9 +163,13 @@ static void Writer ()
         const std::lock_guard<std::mutex> lock(ringMutex);
         rbuf.pushInquire(available, start);
         size_t expected_available = std::min(
-            pop_pad,
+            push_pad,
             ring_size - std::min(ring_size, rbuf.size()));
-        assert(available >= expected_available);
+        if (available < expected_available)
+        {
+            std::cerr << "DEFECT: push: " << available << " < " <<
+                expected_available << std::endl;
+        }
         write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
         if (available)
@@ -211,7 +225,11 @@ static void Reader ()
         size_t expected_available = std::min(
             pop_pad,
             std::min(ring_size, rbuf.size()));
-        assert(available >= expected_available);
+        if (available < expected_available)
+        {
+            std::cerr << "DEFECT: pop: " << available << " < " <<
+                expected_available << std::endl;
+        }
         read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);
         if (available)
@@ -228,7 +246,7 @@ static void Reader ()
                 {
                     std::cout << "*** ERROR *** ";
                     std::cout << "Pop: expected " << serial << " got " <<
-                        start << " offset " << i << std::endl;
+                        start->serial() << " offset " << i << std::endl;
                     exit(1);
                 }
                 ++start;

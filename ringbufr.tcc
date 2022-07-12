@@ -2,6 +2,9 @@
 #ifndef __RINGBUFR_TCC
 #define __RINGBUFR_TCC
 
+static int overlap_fail = 0;
+static int scarce_fail = 0;
+
 #include <cassert>
 #include <algorithm>
 #include <string.h>
@@ -39,6 +42,35 @@ namespace {
             auto& sr  = *src++;
             des = std::move(sr);
         }
+    }
+
+    template<typename _T>
+    inline void qmove(_T* dest, _T* src, size_t n);
+    #define SPECIALIZE_QMOVE(atype)                                  \
+        template<>                                                   \
+        inline void qmove<atype>(atype* dest, atype* src, size_t n)  \
+        {                                                            \
+            memcpy(dest, src, sizeof(atype)*n);                      \
+        }
+    SPECIALIZE_QMOVE(bool)
+    SPECIALIZE_QMOVE(unsigned char)
+    SPECIALIZE_QMOVE(char)
+    SPECIALIZE_QMOVE(unsigned short)
+    SPECIALIZE_QMOVE(short)
+    SPECIALIZE_QMOVE(unsigned int)
+    SPECIALIZE_QMOVE(int)
+    SPECIALIZE_QMOVE(unsigned long)
+    SPECIALIZE_QMOVE(long)
+    SPECIALIZE_QMOVE(unsigned long long)
+    SPECIALIZE_QMOVE(long long)
+    SPECIALIZE_QMOVE(float)
+    SPECIALIZE_QMOVE(double)
+    SPECIALIZE_QMOVE(long double)
+    template<typename _T>
+    inline void qmove(_T* dest, _T* src, size_t n)
+    {
+        assert(dest <= src);
+        qcopy(dest, src, n);
     }
 }
 
@@ -148,6 +180,8 @@ void RingbufR<_T>::push(size_t increment)
     }
 
     if (_push_next == _ring_end) _push_next = _ring_start;
+    // A stub may have been created.
+    adjustStart();
 }
 
 template<typename _T>
@@ -173,7 +207,6 @@ void RingbufR<_T>::popInquire(size_t& available, _T*& start) const
     start = _pop_next;
 }
 
-// pop
 template<typename _T>
 void RingbufR<_T>::pop(size_t increment)
 {
@@ -208,7 +241,15 @@ void RingbufR<_T>::pop(size_t increment)
     _pop_next = new_next;
     if (_pop_next == _ring_end) _pop_next = _ring_start;
     _empty = (_pop_next == _push_next);
+    auto state = getState();
+    adjustStart();
+    state = getState();
+}
 
+template<typename _T>
+void RingbufR<_T>::adjustStart()
+{
+    auto state = getState();
     if (!_empty)
     {
         // Buffer shifts
@@ -223,25 +264,55 @@ void RingbufR<_T>::pop(size_t increment)
             if (stub_data < _pop_pad)
             {
                 // The stub data is too small. 
-                if (_ring_start < _neutral_start)
+                if (_ring_start >= _neutral_start)
                 {
-                    // Pop pad already in use. Don't use it again.
-                    size_t reverse_stub = _neutral_start - _ring_start;
-                    _T* dest = _pop_next - reverse_stub;
-                    assert(dest >= _push_next);
-                    qcopy(dest, _ring_start, reverse_stub);
-                    _ring_start = _neutral_start;
-                    _pop_next = dest;
-                }
-                else
-                {
-                    // Make the push pad available
+                    // This shift has not been done previously. Do it now.
                     _ring_start -= stub_data;
                     assert(_ring_start >= _edge_start);
                     qcopy(_ring_start, _pop_next, stub_data);
                     _pop_next = _ring_start;
                 }
+                else
+                {
+                    // This shift has been done previously. Don't do it again.
+                    // Instead, move old data into stub.
+
+                    size_t available =
+                        std::min(_neutral_start, _push_next) - _ring_start;
+                    size_t reverse_stub = _pop_pad - stub_data;
+                    if (available >= reverse_stub)
+                    {
+                        _T* new_pop = _pop_next - reverse_stub;
+                        if (new_pop >= _push_next)
+                        {
+                            // Shift stub to left to make room
+                            validate(_ring_start, _push_next - _ring_start);
+                            qmove(new_pop, _pop_next, _ring_end - _pop_next);
+                            validate(new_pop, _ring_end - _pop_next);
+                            // Now we can move the leftmost data into place
+                            qcopy(
+                                _ring_end - reverse_stub, _ring_start,
+                                reverse_stub);
+                            validate(_ring_end - reverse_stub, reverse_stub);
+                            validate(new_pop, _pop_pad);
+                            _ring_start += reverse_stub;
+                            assert(_ring_start <= _neutral_start);
+                            _pop_next = new_pop;
+                            assert((_pop_next + _pop_pad) == _ring_end);
+                            validate(_pop_next, _pop_pad);
+                        }
+                        else
+                        {
+                            ++scarce_fail;
+                        }
+                    }
+                    else
+                    {
+                        ++overlap_fail;
+                    }
+                }
             }
+            state = getState();
         }
     }
 }
@@ -283,6 +354,26 @@ template<typename _T>
 const _T* RingbufR<_T>::ring_end() const
 {
     return _ring_end;
+}
+
+template<typename _T>
+RingbufR<_T>::debugState RingbufR<_T>::getState() const
+{
+    debugState state;
+    state.ring_start = _ring_start - _edge_start;
+    state.ring_end = _ring_end - _edge_start;
+    state.neutral_start = _neutral_start - _edge_start;
+    state.neutral_end = _neutral_end - _edge_start;
+    state.pop_next = _pop_next - _edge_start;
+    state.push_next = _push_next - _edge_start;
+    state.empty = _empty;
+    return state;
+}
+
+template<typename _T>
+void RingbufR<_T>::validate(const _T* /*start*/, size_t /*count*/)
+{
+    // The user can override as desired.
 }
 
 #endif // __RINGBUFR_TCC
