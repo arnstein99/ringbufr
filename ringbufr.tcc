@@ -141,6 +141,7 @@ void RingbufR<_T>::push(size_t increment)
 {
     if (increment == 0) return;
 
+    bool wrap_around = false;
     auto new_next = _push_next + increment;
     _T* limit;
     if (_empty)
@@ -153,7 +154,7 @@ void RingbufR<_T>::push(size_t increment)
     {
         if (_push_next <= _pop_next)
         {
-            // Wrap-around is in effect
+            wrap_around = true;
             limit = _pop_next;
         }
         else
@@ -170,36 +171,35 @@ void RingbufR<_T>::push(size_t increment)
 
     // Update complete. Shift buffer to avoid short push later.
     _push_next = new_next;
-    adjustEnd();
+    if (!wrap_around) adjustEnd();
 
     // A stub may have been created.
     adjustStart();
 }
 
 template<typename _T>
-void RingbufR<_T>::adjustEnd()
+bool RingbufR<_T>::adjustEnd()
 {
-    if (_push_next > _pop_next)
+    bool wrap_around = false;
+    size_t unused_ring = _ring_end - _push_next;
+    if (unused_ring < _push_pad)
     {
-        // Wrap-around is not in effect, should proceed.
-        size_t unused_ring = _ring_end - _push_next;
-        if (unused_ring < _push_pad)
+        // Unused space at right of ring buffer is too small. May lead to
+        // fragmentation.
+        if (_push_next > _neutral_end)
         {
-            // Unused space at right of ring buffer is too small. May lead to
-            // fragmentation.
-            if (_push_next > _neutral_end)
-            {
-                // Push pad already in use. Don't use it again.
-                _ring_end = _push_next;
-            }
-            else
-            {
-                // Make the push pad available
-                _ring_end = _push_next + _push_pad;
-            }
+            // Push pad already in use. Don't use it again.
+            _ring_end = _push_next;
+            wrap_around = true;
+        }
+        else
+        {
+            // Make the push pad available
+            _ring_end = _push_next + _push_pad;
         }
     }
     if (_push_next == _ring_end) _push_next = _ring_start;
+    return wrap_around;
 }
 
 template<typename _T>

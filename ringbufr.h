@@ -64,7 +64,9 @@ public:
 private:
 
     void adjustStart();
-    void adjustEnd();
+    // Should not be called if wrap-around is already in effect.
+    // return value: wrap-around is in effect.
+    bool adjustEnd();
 
     const size_t _capacity;
     const size_t _push_pad;
