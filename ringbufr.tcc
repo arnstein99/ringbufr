@@ -264,6 +264,8 @@ void RingbufR<_T>::adjustStart()
         // Buffer shifts
         if (_push_next < _pop_next)
         {
+            validate(_ring_start, _push_next - _ring_start);
+            validate(_pop_next, _ring_end - _pop_next);
             // Wrap-around is in effect, should proceed.
             size_t stub_data = _ring_end - _pop_next;
 
@@ -273,17 +275,18 @@ void RingbufR<_T>::adjustStart()
             if (stub_data < _pop_pad)
             {
                 // The stub data is too small. 
-                if (_ring_start >= _neutral_start)
+                if (_ring_start >= (_edge_start + stub_data))
                 {
-                    // This shift has not been done previously. Do it now.
+                    // There is room to move left.
                     _ring_start -= stub_data;
                     assert(_ring_start >= _edge_start);
                     qcopy(_ring_start, _pop_next, stub_data);
                     _pop_next = _ring_start;
+                    validate(_pop_next, _push_next - _pop_next);
                 }
                 else
                 {
-                    // This shift has been done previously. Don't do it again.
+                    // No room to move left.
                     // Instead, move old data into stub.
 
                     size_t available =
@@ -305,12 +308,14 @@ void RingbufR<_T>::adjustStart()
                             _ring_end - reverse_stub, _ring_start,
                             reverse_stub);
                         validate(_ring_end - reverse_stub, reverse_stub);
-                        validate(new_pop, _ring_end - _pop_next + reverse_stub);
+                        validate(new_pop, _ring_end - new_pop);
                         _ring_start += reverse_stub;
                         assert(_ring_start <= _neutral_start);
                         _pop_next = new_pop;
                         // assert((_pop_next + ???) == _ring_end);
                         // validate(_pop_next, ???);
+                        validate(_ring_start, _push_next - _ring_start);
+                        validate(_pop_next, _ring_end - _pop_next);
                     }
                     else
                     {
@@ -319,6 +324,19 @@ void RingbufR<_T>::adjustStart()
                 }
             }
             state = getState();
+        }
+        else
+        {
+            // Wrap-around is not in effect. Conserve the pop pad.
+            validate(_pop_next, _push_next - _pop_next);
+            if (_pop_next != _push_next) // Experimental "if"
+            {
+                if (_pop_next <= _neutral_start)
+                {
+                    _ring_start = _pop_next;
+                }
+            }
+            validate(_pop_next, _push_next - _pop_next);
         }
     }
 }

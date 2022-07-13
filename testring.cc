@@ -11,6 +11,7 @@
 #include <mutex>
 using namespace std::chrono_literals;
 #include "ringbufr.h"
+#include "miscutils.h"
 
 // Tuning
 static const int read_usleep_range  = 50000;
@@ -76,6 +77,10 @@ public:
     {
         return serialNumber;
     }
+    const char* desc() const
+    {
+        return name;
+    }
 private:
     int serialNumber;
     char* name;
@@ -87,10 +92,15 @@ std::ostream& operator<<(std::ostream& ost, const TestClass& tc)
 template <>
 void RingbufR<TestClass>::validate(const TestClass* start, size_t count)
 {
-    auto serial = start->serial();
+    if (count == 0) return;
+    int serial = start->serial();
+    int converted = mstoi(start->desc());
+    assert(converted == serial);
     for (size_t index = 1 ; index < count ; ++index)
     {
         assert (++serial == start[index].serial());
+        converted = mstoi(start[index].desc());
+        assert(converted == serial);
     }
 }
 
@@ -248,6 +258,14 @@ static void Reader ()
                     std::cout << "Pop: expected " << serial << " got " <<
                         start->serial() << " offset " << i << std::endl;
                     exit(1);
+                }
+                int converted = mstoi(start->desc());
+                if (converted != serial)
+                {
+                    std::cout << "*** ERROR *** ";
+                    std::cout << "Pop: corrupted entry at offset " << i;
+                    std::cout << "seq " << serial << " but desc \"";
+                    std::cout << start->desc() << "\"" << std::endl;
                 }
                 ++start;
             }

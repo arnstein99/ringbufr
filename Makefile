@@ -10,7 +10,7 @@ normal: testring tcpcat tcppipe
 obsolete: ringcat tcpget tcpput tcprelay tcppull tcppush
 all: normal obsolete
 
-testring: testring.o
+testring: testring.o miscutils.o
 ringcat: ringcat.o copyfd.o miscutils.o
 tcpget: tcpget.o copyfd.o miscutils.o netutils.o
 tcpput: tcpput.o copyfd.o miscutils.o netutils.o
