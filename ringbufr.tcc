@@ -262,9 +262,6 @@ void RingbufR<_T>::pop(size_t increment)
     auto state = getState();
     adjustStart();
     state = getState();
-
-    // A small free space may have just been created
-    adjustEnd();
 }
 
 template<typename _T>
