@@ -103,9 +103,11 @@ RingbufR<_T>::~RingbufR()
 template<typename _T>
 void RingbufR<_T>::pushInquire(size_t& available, _T*& start) const
 {
+    size_t used;
     if (_empty)
     {
         assert(_push_next == _pop_next);
+        used = 0;
         available = _ring_end - _push_next;
     }
     else
@@ -113,11 +115,22 @@ void RingbufR<_T>::pushInquire(size_t& available, _T*& start) const
         if (_push_next <= _pop_next)
         {
             // Wrap-around is in effect
+            used = (_ring_end - _pop_next) + (_push_next - _ring_start);
             available = _pop_next - _push_next;
         }
         else
         {
             available = _ring_end - _push_next;
+            used = _push_next - _pop_next;
+        }
+        // Over-fill not allowed
+        if (used > _capacity)
+        {
+            available = 0;
+        }
+        else
+        {
+            available = std::min(available, (_capacity - used));
         }
     }
     start = _push_next;
