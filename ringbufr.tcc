@@ -171,7 +171,6 @@ void RingbufR<_T>::push(size_t increment)
     // Update complete. Shift buffer to avoid short push later.
     _push_next = new_next;
     adjustEnd();
-    if (_push_next == _ring_end) _push_next = _ring_start;
 
     // A stub may have been created.
     adjustStart();
@@ -200,6 +199,7 @@ void RingbufR<_T>::adjustEnd()
             }
         }
     }
+    if (_push_next == _ring_end) _push_next = _ring_start;
 }
 
 template<typename _T>
@@ -265,7 +265,6 @@ void RingbufR<_T>::pop(size_t increment)
 
     // A small free space may have just been created
     adjustEnd();
-    if (_push_next == _ring_end) _push_next = _ring_start;
 }
 
 template<typename _T>
@@ -313,20 +312,14 @@ void RingbufR<_T>::adjustStart()
                     if (new_pop >= _push_next)
                     {
                         // Shift stub to left to make room
-                        validate(_ring_start, _push_next - _ring_start);
                         qmove(new_pop, _pop_next, _ring_end - _pop_next);
-                        validate(new_pop, _ring_end - _pop_next);
                         // Now we can move the leftmost data into place
                         qcopy(
                             _ring_end - reverse_stub, _ring_start,
                             reverse_stub);
-                        validate(_ring_end - reverse_stub, reverse_stub);
-                        validate(new_pop, _ring_end - new_pop);
                         _ring_start += reverse_stub;
                         assert(_ring_start <= _neutral_start);
                         _pop_next = new_pop;
-                        // assert((_pop_next + ???) == _ring_end);
-                        // validate(_pop_next, ???);
                         validate(_ring_start, _push_next - _ring_start);
                         validate(_pop_next, _ring_end - _pop_next);
                     }
@@ -337,19 +330,6 @@ void RingbufR<_T>::adjustStart()
                 }
             }
             state = getState();
-        }
-        else
-        {
-            // Wrap-around is not in effect. Conserve the pop pad.
-            validate(_pop_next, _push_next - _pop_next);
-            if (_pop_next != _push_next) // Experimental "if"
-            {
-                if (_pop_next <= _neutral_start)
-                {
-                    _ring_start = _pop_next;
-                }
-            }
-            validate(_pop_next, _push_next - _pop_next);
         }
     }
 }
