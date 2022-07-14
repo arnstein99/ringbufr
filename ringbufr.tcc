@@ -171,10 +171,12 @@ void RingbufR<_T>::push(size_t increment)
 
     // Update complete. Shift buffer to avoid short push later.
     _push_next = new_next;
-    if (!wrap_around) adjustEnd();
-
+    if (!wrap_around)
+    {
+        wrap_around = adjustEnd();
+    }
     // A stub may have been created.
-    adjustStart();
+    if (wrap_around) adjustStart();
 }
 
 template<typename _T>

@@ -63,7 +63,10 @@ public:
 
 private:
 
+    // Should only be called if wrap-around is in effect and
+    // buffer is not empty.
     void adjustStart();
+
     // Should not be called if wrap-around is already in effect.
     // return value: wrap-around is in effect.
     bool adjustEnd();
