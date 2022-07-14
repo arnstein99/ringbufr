@@ -182,7 +182,6 @@ void RingbufR<_T>::push(size_t increment)
 template<typename _T>
 bool RingbufR<_T>::adjustEnd()
 {
-    bool wrap_around = false;
     size_t unused_ring = _ring_end - _push_next;
     if (unused_ring < _push_pad)
     {
@@ -192,7 +191,6 @@ bool RingbufR<_T>::adjustEnd()
         {
             // Push pad already in use. Don't use it again.
             _ring_end = _push_next;
-            wrap_around = true;
         }
         else
         {
@@ -201,7 +199,7 @@ bool RingbufR<_T>::adjustEnd()
         }
     }
     if (_push_next == _ring_end) _push_next = _ring_start;
-    return wrap_around;
+    return (_push_next == _ring_start);
 }
 
 template<typename _T>
