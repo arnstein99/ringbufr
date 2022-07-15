@@ -230,8 +230,9 @@ void RingbufR<_T>::pop(size_t increment)
 {
     if (increment == 0) return;
 
-    auto new_next = _pop_next + increment;
     _T* limit;
+    auto new_next = _pop_next + increment;
+    bool wrap_around = false;
     if (_empty)
     {
         assert(_push_next == _pop_next);
@@ -241,7 +242,7 @@ void RingbufR<_T>::pop(size_t increment)
     {
         if (_push_next <= _pop_next)
         {
-            // Wrap-around is in effect
+            wrap_around = true;
             limit = _ring_end;
         }
         else
@@ -257,10 +258,14 @@ void RingbufR<_T>::pop(size_t increment)
 
     // Update complete.
     _pop_next = new_next;
-    if (_pop_next == _ring_end) _pop_next = _ring_start;
+    if (_pop_next == _ring_end)
+    {
+        wrap_around = true;
+        _pop_next = _ring_start;
+    }
     _empty = (_pop_next == _push_next);
     auto state = getState();
-    adjustStart();
+    if (wrap_around && !_empty) adjustStart();
     state = getState();
 }
 
