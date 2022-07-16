@@ -290,6 +290,7 @@ void RingbufR<_T>::adjustStart()
                 if (_ring_start >= (_edge_start + stub_data))
                 {
                     // There is room to move left.
+                    ++_internal_copies;
                     _ring_start -= stub_data;
                     assert(_ring_start >= _edge_start);
                     qcopy(_ring_start, _pop_next, stub_data);
