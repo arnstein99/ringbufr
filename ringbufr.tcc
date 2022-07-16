@@ -377,7 +377,7 @@ const _T* RingbufR<_T>::ring_end() const
 }
 
 template<typename _T>
-RingbufR<_T>::debugState RingbufR<_T>::getState() const
+typename RingbufR<_T>::debugState RingbufR<_T>::getState() const
 {
     debugState state;
     state.ring_start = _ring_start - _edge_start;

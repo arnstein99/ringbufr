@@ -14,7 +14,7 @@
 using namespace std::chrono;
 #endif // VERBOSE
 
-size_t copyfd(
+copyfd_stats copyfd(
     int readfd, int writefd,
     size_t buffer_size, size_t push_pad, size_t pop_pad)
 {
@@ -25,7 +25,7 @@ size_t copyfd(
         buffer_size, push_pad, pop_pad);
 }
 
-size_t copyfd_while(
+copyfd_stats copyfd_while(
     int readfd, int writefd,
     const std::atomic<bool>& continue_flag, long check_usec,
     size_t buffer_size, size_t push_pad, size_t pop_pad)
@@ -47,7 +47,7 @@ size_t copyfd_while(
 
     ssize_t bytes_read = 0;
     ssize_t bytes_write = 0;
-    size_t bytes_processed = 0;
+    size_t bytes_copied = 0;
     size_t read_available;
     size_t write_available;
     do
@@ -81,7 +81,7 @@ size_t copyfd_while(
                 else
                 {
                     // Some other error on input
-                    ReadException r(errno, bytes_processed);
+                    ReadException r(errno, bytes_copied);
                     throw(r);
                 }
             }
@@ -123,21 +123,21 @@ size_t copyfd_while(
                 else
                 {
                     // Some other error on write
-                    WriteException w(errno, bytes_processed);
+                    WriteException w(errno, bytes_copied);
                     throw(w);
                 }
             }
             else if (bytes_write == 0)
             {
                 // EOF on write.
-                WriteException w(0, bytes_processed);
+                WriteException w(0, bytes_copied);
                 throw(w);
             }
             else
             {
                 // Some data was output, no need to select.
                 bufr.pop(bytes_write);
-                bytes_processed += bytes_write;
+                bytes_copied += bytes_write;
             }
         }
 
@@ -178,7 +178,13 @@ size_t copyfd_while(
     } while ((bytes_read || bytes_write) && continue_flag);
     // Includes negative values, meaning select() was just called.
 
-    return bytes_processed;
+    copyfd_stats stats;
+    stats.bytes_copied = bytes_copied;
+    auto result = bufr.getState();
+    stats.reads = result.pushes;
+    stats.writes = result.pops;
+    stats.internal_copies = result.internal_copies;
+    return stats;
 }
 
 #include "ringbufr.tcc"
