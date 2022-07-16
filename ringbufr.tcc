@@ -2,8 +2,6 @@
 #ifndef __RINGBUFR_TCC
 #define __RINGBUFR_TCC
 
-static int scarce_fail = 0;
-
 #include <cassert>
 #include <algorithm>
 #include <string.h>
@@ -91,6 +89,9 @@ RingbufR<_T>::RingbufR (size_t capacity, size_t push_pad, size_t pop_pad)
     _ring_end   = _neutral_end;
     _push_next  = _ring_start;
     _pop_next   = _ring_start;
+    _internal_copies = 0;
+    _pushes = 0;
+    _pops = 0;
     _empty = true;
 }
 
@@ -141,6 +142,7 @@ void RingbufR<_T>::push(size_t increment)
 {
     if (increment == 0) return;
 
+    ++_pushes;
     bool wrap_around = false;
     auto new_next = _push_next + increment;
     _T* limit;
@@ -230,6 +232,7 @@ void RingbufR<_T>::pop(size_t increment)
 {
     if (increment == 0) return;
 
+    ++_pops;
     _T* limit;
     auto new_next = _pop_next + increment;
     bool wrap_around = false;
@@ -264,22 +267,17 @@ void RingbufR<_T>::pop(size_t increment)
         _pop_next = _ring_start;
     }
     _empty = (_pop_next == _push_next);
-    auto state = getState();
     if (wrap_around && !_empty) adjustStart();
-    state = getState();
 }
 
 template<typename _T>
 void RingbufR<_T>::adjustStart()
 {
-    auto state = getState();
     if (!_empty)
     {
         // Buffer shifts
         if (_push_next < _pop_next)
         {
-            validate(_ring_start, _push_next - _ring_start);
-            validate(_pop_next, _ring_end - _pop_next);
             // Wrap-around is in effect, should proceed.
             size_t stub_data = _ring_end - _pop_next;
 
@@ -296,7 +294,8 @@ void RingbufR<_T>::adjustStart()
                     assert(_ring_start >= _edge_start);
                     qcopy(_ring_start, _pop_next, stub_data);
                     _pop_next = _ring_start;
-                    validate(_pop_next, _push_next - _pop_next);
+                    // Wrap-around condition ends. All of the data is at the
+                    // start of the ring.
                 }
                 else
                 {
@@ -308,7 +307,12 @@ void RingbufR<_T>::adjustStart()
                     size_t reverse_stub = _pop_pad - stub_data;
                     if (available < reverse_stub)
                     {
+                        // This is what happens when the buffer is nearly empty
                         reverse_stub = available;
+                    }
+                    if (reverse_stub)
+                    {
+                        ++_internal_copies;
                     }
                     _T* new_pop = _pop_next - reverse_stub;
                     if (new_pop >= _push_next)
@@ -325,13 +329,10 @@ void RingbufR<_T>::adjustStart()
                         validate(_ring_start, _push_next - _ring_start);
                         validate(_pop_next, _ring_end - _pop_next);
                     }
-                    else
-                    {
-                        ++scarce_fail;
-                    }
+                    // else
+                        // This is what happens when the buffer is nearly full
                 }
             }
-            state = getState();
         }
     }
 }
@@ -385,6 +386,9 @@ RingbufR<_T>::debugState RingbufR<_T>::getState() const
     state.neutral_end = _neutral_end - _edge_start;
     state.pop_next = _pop_next - _edge_start;
     state.push_next = _push_next - _edge_start;
+    state.internal_copies = _internal_copies;
+    state.pushes = _pushes;
+    state.pops = _pops;
     state.empty = _empty;
     return state;
 }

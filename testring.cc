@@ -179,6 +179,7 @@ static void Writer ()
         {
             std::cerr << "DEFECT: push: " << available << " < " <<
                 expected_available << std::endl;
+            exit(1);
         }
         write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
@@ -239,6 +240,7 @@ static void Reader ()
         {
             std::cerr << "DEFECT: pop: " << available << " < " <<
                 expected_available << std::endl;
+            exit(1);
         }
         read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);

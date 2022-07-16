@@ -57,6 +57,9 @@ public:
         size_t neutral_end;
         size_t push_next;
         size_t pop_next;
+        size_t internal_copies;
+        size_t pushes;
+        size_t pops;
         bool  empty;
     };
     debugState getState() const;
@@ -79,6 +82,9 @@ private:
     _T* const _neutral_start;
     _T* const _neutral_end;
     bool _empty;
+    size_t _internal_copies;
+    size_t _pushes;
+    size_t _pops;
     _T* _push_next;
     _T* _pop_next;
     _T* _ring_start;
