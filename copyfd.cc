@@ -50,6 +50,7 @@ copyfd_stats copyfd_while(
     size_t bytes_copied = 0;
     size_t read_available;
     size_t write_available;
+    bool l_continue = true;
     do
     {
         fd_set* p_read_set = nullptr;
@@ -147,6 +148,8 @@ copyfd_stats copyfd_while(
 
         if (p_read_set || p_write_set)
         {
+            // Optimization
+            l_continue = continue_flag;
             int select_return;
             NEGCHECK("select",
                 (select_return = select(
@@ -175,7 +178,7 @@ copyfd_stats copyfd_while(
         std::cerr << std::endl;
 #endif
 
-    } while ((bytes_read || bytes_write) && continue_flag);
+    } while ((bytes_read || bytes_write) && l_continue);
     // Includes negative values, meaning select() was just called.
 
     copyfd_stats stats;
