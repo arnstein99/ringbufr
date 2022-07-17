@@ -17,7 +17,7 @@ struct Uri
 };
 static Uri process_args(int& argc, char**& argv);
 
-static size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag);
+static void copy(int firstFD, int secondFD, const std::atomic<bool>& cflag);
 static void usage_error();
 
 int main (int argc, char* argv[])
@@ -175,26 +175,25 @@ void usage_error()
     exit (1);
 }
 
-size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
+void copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
 {
     if (firstFD  == -1) firstFD  = 0;
     if (secondFD == -1) secondFD = 1;
     set_flags(firstFD , O_NONBLOCK);
     set_flags(secondFD, O_NONBLOCK);
-    size_t bytes_processed = 0;
     try
     {
 #if (VERBOSE >= 1)
         std::cerr << "starting copy, FD " << firstFD <<
             " to FD " << secondFD << std::endl;
-        bytes_processed =
-            copyfd_while(
-                firstFD, secondFD, cflag, 500000, 128*1024, 2*1024, 2*1024);
-        std::cerr << bytes_processed << " copied" << std::endl;
+        auto stats = copyfd_while(
+            firstFD, secondFD, cflag, 500000, 128*1024, 2*1024, 2*1024);
+        std::cerr << stats.bytes_copied << " bytes, " <<
+            stats.reads+stats.writes << " ops, " <<
+            stats.internal_copies << " shuffles" << std::endl;
 #else
-        bytes_processed =
-            copyfd_while
-                (firstFD, secondFD, cflag, 500000, 128*1024, 2*1024, 2*1024);
+        copyfd_while(
+            firstFD, secondFD, cflag, 500000, 128*1024, 2*1024, 2*1024);
 #endif
     }
     catch (const ReadException& r)
@@ -209,5 +208,4 @@ size_t copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
             std::endl;
         std::cerr << strerror(w.errn) << std::endl;
     }
-    return bytes_processed;
 }

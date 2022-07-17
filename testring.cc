@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cassert>
 #include <cstring>
 #include <iostream>
 #include <errno.h>
@@ -10,13 +11,14 @@
 #include <mutex>
 using namespace std::chrono_literals;
 #include "ringbufr.h"
+#include "miscutils.h"
 
 // Tuning
-static const int read_usleep_range  = 500000;
-static const int write_usleep_range = 500000;
-static const size_t buffer_size = 37 + 7 + 6;
+static const int read_usleep_range  = 50000;
+static const int write_usleep_range = 50000;
 static const size_t push_pad = 7;
 static const size_t pop_pad = 6;
+static const size_t ring_size = 37;
 static const size_t verbose = 1;
 #define DEFAULT_RUN_SECONDS 300
 
@@ -75,6 +77,10 @@ public:
     {
         return serialNumber;
     }
+    const char* desc() const
+    {
+        return name;
+    }
 private:
     int serialNumber;
     char* name;
@@ -82,6 +88,20 @@ private:
 std::ostream& operator<<(std::ostream& ost, const TestClass& tc)
 {
     return tc.print(ost);
+}
+template <>
+void RingbufR<TestClass>::validate(const TestClass* start, size_t count)
+{
+    if (count == 0) return;
+    int serial = start->serial();
+    int converted = mstoi(start->desc());
+    assert(converted == serial);
+    for (size_t index = 1 ; index < count ; ++index)
+    {
+        assert (++serial == start[index].serial());
+        converted = mstoi(start[index].desc());
+        assert(converted == serial);
+    }
 }
 
 const TestClass* buffer;
@@ -92,7 +112,8 @@ int my_rand(int lower, int upper)
     return lower + rand() % (upper - lower);
 }
 
-static RingbufR<TestClass> rbuf (buffer_size, push_pad, pop_pad);
+static RingbufR<TestClass> rbuf (
+    ring_size + push_pad + pop_pad, push_pad, pop_pad);
 static bool running = true;
 
 static void Reader ();
@@ -151,6 +172,15 @@ static void Writer ()
         TestClass* start;
         const std::lock_guard<std::mutex> lock(ringMutex);
         rbuf.pushInquire(available, start);
+        size_t expected_available = std::min(
+            push_pad,
+            ring_size - std::min(ring_size, rbuf.size()));
+        if (available < expected_available)
+        {
+            std::cerr << "DEFECT: push: " << available << " < " <<
+                expected_available << std::endl;
+            exit(1);
+        }
         write_usleep = my_rand(1, write_usleep_range);
         std::this_thread::sleep_for(write_usleep * 1us);
         if (available)
@@ -179,11 +209,12 @@ static void Writer ()
             }
             last_write_value = serial;
             std::cout << "size is now " << rbuf.size() <<
-                ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
+                ", ring is (" << rbuf.ring_start() - buffer <<
+                "," << rbuf.ring_end() - buffer << ")" <<std::endl;
         }
         else
         {
-            assert (rbuf.size() == (buffer_size - push_pad - pop_pad));
+            assert (rbuf.size() >= ring_size);
             std::cout << "(will push 0 (buffer is full))" << std::endl;
         }
     }
@@ -202,6 +233,15 @@ static void Reader ()
         TestClass* start;
         const std::lock_guard<std::mutex> lock(ringMutex);
         rbuf.popInquire(available, start);
+        size_t expected_available = std::min(
+            pop_pad,
+            std::min(ring_size, rbuf.size()));
+        if (available < expected_available)
+        {
+            std::cerr << "DEFECT: pop: " << available << " < " <<
+                expected_available << std::endl;
+            exit(1);
+        }
         read_usleep = my_rand(1, read_usleep_range);
         std::this_thread::sleep_for(read_usleep * 1us);
         if (available)
@@ -218,8 +258,16 @@ static void Reader ()
                 {
                     std::cout << "*** ERROR *** ";
                     std::cout << "Pop: expected " << serial << " got " <<
-                        start << " offset " << i << std::endl;
+                        start->serial() << " offset " << i << std::endl;
                     exit(1);
+                }
+                int converted = mstoi(start->desc());
+                if (converted != serial)
+                {
+                    std::cout << "*** ERROR *** ";
+                    std::cout << "Pop: corrupted entry at offset " << i;
+                    std::cout << "seq " << serial << " but desc \"";
+                    std::cout << start->desc() << "\"" << std::endl;
                 }
                 ++start;
             }
@@ -234,7 +282,8 @@ static void Reader ()
             }
             last_read_value = serial;
             std::cout << "size is now " << rbuf.size() <<
-                ", ring start is " << rbuf.ring_start() - buffer <<std::endl;
+                ", ring is (" << rbuf.ring_start() - buffer <<
+                "," << rbuf.ring_end() - buffer << ")" <<std::endl;
         }
         else
         {

@@ -88,9 +88,11 @@ int main (int argc, char* argv[])
 #if (VERBOSE >= 1)
         std::cerr << "starting copy, socket " << socketFD[0] <<
             " to socket " << socketFD[1] << std::endl;
-        auto bytes_processed =
+        auto stats = 
             copyfd(socketFD[0], socketFD[1], 128*1024, 2*1024, 2*1024);
-        std::cerr << bytes_processed << " copied" << std::endl;
+        std::cerr << stats.bytes_copied << " bytes, " <<
+            stats.reads+stats.writes << " ops, " <<
+            stats.internal_copies << " shuffles" << std::endl;
 #else
         copyfd(socketFD[0], socketFD[1], 128*1024, 2*1024, 2*1024);
 #endif
