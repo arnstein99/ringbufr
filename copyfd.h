@@ -27,6 +27,8 @@ struct copyfd_stats
     size_t internal_copies;
     size_t reads;
     size_t writes;
+    size_t limit_reads;
+    size_t limit_writes;
     size_t bytes_copied;
 };
 

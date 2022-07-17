@@ -89,6 +89,8 @@ RingbufR<_T>::RingbufR (size_t capacity, size_t push_pad, size_t pop_pad)
     _ring_end   = _neutral_end;
     _push_next  = _ring_start;
     _pop_next   = _ring_start;
+    _limit_pops = 0;
+    _limit_pushes = 0;
     _internal_copies = 0;
     _pushes = 0;
     _pops = 0;
@@ -143,6 +145,7 @@ void RingbufR<_T>::push(size_t increment)
     if (increment == 0) return;
 
     ++_pushes;
+    if (increment == _push_pad) ++_limit_pushes;
     bool wrap_around = false;
     auto new_next = _push_next + increment;
     _T* limit;
@@ -233,6 +236,7 @@ void RingbufR<_T>::pop(size_t increment)
     if (increment == 0) return;
 
     ++_pops;
+    if (increment == _pop_pad) ++_limit_pops;
     _T* limit;
     auto new_next = _pop_next + increment;
     bool wrap_around = false;
@@ -387,6 +391,8 @@ typename RingbufR<_T>::debugState RingbufR<_T>::getState() const
     state.neutral_end = _neutral_end - _edge_start;
     state.pop_next = _pop_next - _edge_start;
     state.push_next = _push_next - _edge_start;
+    state.limit_pops = _limit_pops;
+    state.limit_pushes = _limit_pushes;
     state.internal_copies = _internal_copies;
     state.pushes = _pushes;
     state.pops = _pops;

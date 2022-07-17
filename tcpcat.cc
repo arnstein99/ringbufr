@@ -89,12 +89,15 @@ int main (int argc, char* argv[])
         std::cerr << "starting copy, socket " << socketFD[0] <<
             " to socket " << socketFD[1] << std::endl;
         auto stats = 
-            copyfd(socketFD[0], socketFD[1], 128*1024, 2*1024, 2*1024);
+            copyfd(socketFD[0], socketFD[1], 128*1024, PUSH_PAD, POP_PAD);
         std::cerr << stats.bytes_copied << " bytes, " <<
-            stats.reads+stats.writes << " ops, " <<
+            stats.reads << " reads, " <<
+            stats.writes << " writes, " <<
+            stats.limit_reads << " limit reads, " <<
+            stats.limit_writes << " limit writes, " <<
             stats.internal_copies << " shuffles" << std::endl;
 #else
-        copyfd(socketFD[0], socketFD[1], 128*1024, 2*1024, 2*1024);
+        copyfd(socketFD[0], socketFD[1], 128*1024, PUSH_PAD, POP_PAD);
 #endif
     }
     catch (const ReadException& r)

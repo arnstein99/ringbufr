@@ -187,13 +187,16 @@ void copy(int firstFD, int secondFD, const std::atomic<bool>& cflag)
         std::cerr << "starting copy, FD " << firstFD <<
             " to FD " << secondFD << std::endl;
         auto stats = copyfd_while(
-            firstFD, secondFD, cflag, 500000, 128*1024, 2*1024, 2*1024);
+            firstFD, secondFD, cflag, 500000, 128*1024, PUSH_PAD, POP_PAD);
         std::cerr << stats.bytes_copied << " bytes, " <<
-            stats.reads+stats.writes << " ops, " <<
+            stats.reads << " reads, " <<
+            stats.writes << " writes, " <<
+            stats.limit_reads << " limit reads, " <<
+            stats.limit_writes << " limit writes, " <<
             stats.internal_copies << " shuffles" << std::endl;
 #else
         copyfd_while(
-            firstFD, secondFD, cflag, 500000, 128*1024, 2*1024, 2*1024);
+            firstFD, secondFD, cflag, 500000, 128*1024, PUSH_PAD, POP_PAD);
 #endif
     }
     catch (const ReadException& r)

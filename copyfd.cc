@@ -186,6 +186,8 @@ copyfd_stats copyfd_while(
     auto result = bufr.getState();
     stats.reads = result.pushes;
     stats.writes = result.pops;
+    stats.limit_reads = result.limit_pushes;
+    stats.limit_writes = result.limit_pops;
     stats.internal_copies = result.internal_copies;
     return stats;
 }
