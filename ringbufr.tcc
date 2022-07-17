@@ -144,8 +144,10 @@ void RingbufR<_T>::push(size_t increment)
 {
     if (increment == 0) return;
 
+#ifndef NDEBUG
     ++_pushes;
     if (increment == _push_pad) ++_limit_pushes;
+#endif
     bool wrap_around = false;
     auto new_next = _push_next + increment;
     _T* limit;
@@ -157,6 +159,9 @@ void RingbufR<_T>::push(size_t increment)
     }
     else
     {
+#ifdef NDEBUG
+        if (_push_next <= _pop_next) wrap_around = true;
+#else
         if (_push_next <= _pop_next)
         {
             wrap_around = true;
@@ -167,12 +172,15 @@ void RingbufR<_T>::push(size_t increment)
             limit = _ring_end;
         }
     }
+#endif
 
+#ifndef NDEBUG
     if (new_next > limit)
     {
         // Corruption has already occurred.
         throw RingbufRFullException();
     }
+#endif
 
     // Update complete. Shift buffer to avoid short push later.
     _push_next = new_next;
@@ -235,8 +243,10 @@ void RingbufR<_T>::pop(size_t increment)
 {
     if (increment == 0) return;
 
+#ifndef NDEBUG
     ++_pops;
     if (increment == _pop_pad) ++_limit_pops;
+#endif
     _T* limit;
     auto new_next = _pop_next + increment;
     bool wrap_around = false;
@@ -247,6 +257,9 @@ void RingbufR<_T>::pop(size_t increment)
     }
     else
     {
+#ifdef NDEBUG
+        if (_push_next <= _pop_next) wrap_around = true;
+#else
         if (_push_next <= _pop_next)
         {
             wrap_around = true;
@@ -256,12 +269,15 @@ void RingbufR<_T>::pop(size_t increment)
         {
             limit = _push_next;
         }
+#endif
     }
+#ifndef NDEBUG
     if (new_next > limit)
     {
         // Invalid data has already been copied out
         throw RingbufREmptyException();
     }
+#endif
 
     // Update complete.
     _pop_next = new_next;
@@ -294,7 +310,9 @@ void RingbufR<_T>::adjustStart()
                 if (_ring_start >= (_edge_start + stub_data))
                 {
                     // There is room to move left.
+#ifndef NDEBUG
                     ++_internal_copies;
+#endif
                     _ring_start -= stub_data;
                     assert(_ring_start >= _edge_start);
                     qcopy(_ring_start, _pop_next, stub_data);
@@ -315,10 +333,9 @@ void RingbufR<_T>::adjustStart()
                         // This is what happens when the buffer is nearly empty
                         reverse_stub = available;
                     }
-                    if (reverse_stub)
-                    {
-                        ++_internal_copies;
-                    }
+#ifndef NDEBUG
+                    ++_internal_copies;
+#endif
                     _T* new_pop = _pop_next - reverse_stub;
                     if (new_pop >= _push_next)
                     {
