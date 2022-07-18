@@ -29,6 +29,7 @@ struct copyfd_stats
     size_t writes;
     size_t limit_reads;
     size_t limit_writes;
+    size_t waits;
     size_t bytes_copied;
 };
 

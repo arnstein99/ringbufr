@@ -95,7 +95,8 @@ int main (int argc, char* argv[])
             stats.writes << " writes, " <<
             stats.limit_reads << " limit reads, " <<
             stats.limit_writes << " limit writes, " <<
-            stats.internal_copies << " shuffles" << std::endl;
+            stats.internal_copies << " shuffles, " <<
+            stats.waits << " waits" << std::endl;
 #else
         copyfd(socketFD[0], socketFD[1], 128*1024, PUSH_PAD, POP_PAD);
 #endif

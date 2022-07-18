@@ -47,6 +47,7 @@ copyfd_stats copyfd_while(
 
     ssize_t bytes_read = 0;
     ssize_t bytes_write = 0;
+    size_t waits = 0;
     size_t bytes_copied = 0;
     size_t read_available;
     size_t write_available;
@@ -154,6 +155,9 @@ copyfd_stats copyfd_while(
             NEGCHECK("select",
                 (select_return = select(
                     maxfd, p_read_set, p_write_set, nullptr, tvp)));
+#ifndef NDEBUG
+            ++waits;
+#endif
         }
 
 #if (VERBOSE >= 2)
@@ -182,6 +186,7 @@ copyfd_stats copyfd_while(
     // Includes negative values, meaning select() was just called.
 
     copyfd_stats stats;
+    stats.waits = waits;
     stats.bytes_copied = bytes_copied;
     auto result = bufr.getState();
     stats.reads = result.pushes;

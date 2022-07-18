@@ -1,4 +1,11 @@
 # Tuning
+ifeq ($(strip $(OPT)),)
+    CCFLAGS += -g
+    LDFLAGS += -g
+else
+    CCFLAGS += $(OPT)
+    LDFLAGS += $(OPT)
+endif
 ifneq ($(strip $(NDEBUG)),)
     CPPFLAGS += -DVERBOSE=$(NDEBUG)
 endif
@@ -16,7 +23,7 @@ else
     CPPFLAGS += -DPOP_PAD=$(POP_PAD)
 endif
 
-CCFLAGS += -std=c++2a -g -Wall
+CCFLAGS += -std=c++2a -Wall
 LDLIBS += -lpthread
 LINK.o = c++ $(LDFLAGS)
 COMPILE.cc = c++ -c $(CPPFLAGS) $(CCFLAGS)
