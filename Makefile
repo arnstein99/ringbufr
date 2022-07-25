@@ -7,7 +7,7 @@ else
     LDFLAGS += $(OPT)
 endif
 ifneq ($(strip $(NDEBUG)),)
-    CPPFLAGS += -DVERBOSE=$(NDEBUG)
+    CPPFLAGS += -DNDEBUG=$(NDEBUG)
 endif
 ifneq ($(strip $(VERBOSE)),)
     CPPFLAGS += -DVERBOSE=$(VERBOSE)
